@@ -17,6 +17,8 @@ const authRoutes = require('./src/routes/authRoute');
 // const orderRoutes = require('./src/routes/orderRoutes');
 
 const app = express();
+app.use(cors());
+
 
 // Trust proxy for rate limiting behind reverse proxy
 app.set('trust proxy', 1);
