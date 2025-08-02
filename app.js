@@ -74,6 +74,15 @@ app.get('/api/v1', (req, res) => {
   });
 });
 
+// Handle 404 - Route not found
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    message: `Route ${req.originalUrl} not found`,
+    timestamp: new Date().toISOString()
+  });
+});
+
 // Global error handler
 app.use((error, req, res, next) => {
   console.error('Error:', error);
