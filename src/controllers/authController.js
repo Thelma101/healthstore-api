@@ -41,7 +41,11 @@ const response = {
     res.status(409).json({ success: false, message: msg }),
 
   error: (res, msg = 'Server Error', code = 500) =>
+    res.status(code).json({ success: false, message: msg }),
+
+  403: (res, msg = 'Server Error', code = 403) =>
     res.status(code).json({ success: false, message: msg })
+  
 };
 
 // ==== HELPERS ====

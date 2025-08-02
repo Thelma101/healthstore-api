@@ -17,6 +17,8 @@ const server = app.listen(PORT, () => {
   `);
 });
 
+exports = server;
+
 // // Handle unhandled promise rejections
 // process.on('unhandledRejection', (err, promise) => {
 //   console.error('Unhandled Promise Rejection:', err.message);

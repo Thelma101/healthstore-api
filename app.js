@@ -11,6 +11,7 @@ const path = require('path');
 
 // Route imports
 const authRoutes = require('./src/routes/authRoute');
+
 // const drugRoutes = require('./src/routes/drugRoutes');
 // const categoryRoutes = require('./src/routes/categoryRoutes');
 // const cartRoutes = require('./src/routes/cartRoutes');
@@ -43,6 +44,8 @@ app.use('/api/v1/auth', authRoutes);
 // app.use('/api/v1/categories', categoryRoutes);
 // app.use('/api/v1/cart', cartRoutes);
 // app.use('/api/v1/orders', orderRoutes);
+
+
 
 // Health check endpoint
 app.get('/health', (req, res) => {
