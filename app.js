@@ -1,4 +1,5 @@
 const express = require('express');
+const cors = require('cors');
 const path = require('path');
 // const { 
 //   helmetConfig, 
@@ -9,7 +10,7 @@ const path = require('path');
 // } = require('./src/middleware/security');
 
 // Route imports
-// const authRoutes = require('./src/routes/authRoutes');
+const authRoutes = require('./src/routes/authRoute');
 // const drugRoutes = require('./src/routes/drugRoutes');
 // const categoryRoutes = require('./src/routes/categoryRoutes');
 // const cartRoutes = require('./src/routes/cartRoutes');
@@ -22,7 +23,7 @@ app.set('trust proxy', 1);
 
 // Security middleware
 // app.use(helmetConfig);
-// app.use(cors);
+app.use(cors);
 // app.use(corsErrorHandler);
 // app.use(securityHeaders);
 // app.use(requestSizeLimit);
@@ -35,11 +36,11 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // API routes
-// app.use('/api/auth', authRoutes);
-// app.use('/api/drugs', drugRoutes);
-// app.use('/api/categories', categoryRoutes);
-// app.use('/api/cart', cartRoutes);
-// app.use('/api/orders', orderRoutes);
+app.use('/api/v1/auth', authRoutes);
+// app.use('/api/v1/drugs', drugRoutes);
+// app.use('/api/v1/categories', categoryRoutes);
+// app.use('/api/v1/cart', cartRoutes);
+// app.use('/api/v1/orders', orderRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {

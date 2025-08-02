@@ -13,7 +13,7 @@ const {
 } = require('../controllers/authController');
 
 const { protect } = require('../middleware/auth');
-const { authLimiter } = require('../middleware/security');
+// const { authLimiter } = require('../middleware/security');
 const {
   validateUserRegistration,
   validateUserLogin,
@@ -23,14 +23,14 @@ const {
 
 // Public routes
 router.post('/register', 
-  authLimiter,
+//   authLimiter,
   validateUserRegistration,
   handleValidationErrors,
   register
 );
 
 router.post('/login', 
-  authLimiter,
+//   authLimiter,
   validateUserLogin,
   handleValidationErrors,
   login
