@@ -54,7 +54,7 @@ app.get('/health', (req, res) => {
 });
 
 // API documentation endpoint
-app.get('/api', (req, res) => {
+app.get('/api/v1', (req, res) => {
   res.status(200).json({
     message: 'Pharmacy Store API',
     version: '1.0.0',

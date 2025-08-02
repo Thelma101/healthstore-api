@@ -24,8 +24,8 @@ const {
 // Public routes
 router.post('/register', 
 //   authLimiter,
-  validateUserRegistration,
-  handleValidationErrors,
+//   validateUserRegistration,
+//   handleValidationErrors,
   register
 );
 

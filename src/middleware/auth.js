@@ -64,15 +64,17 @@ const protect = async (req, res, next) => {
 
 // Grant access to specific roles
 const authorize = (...roles) => {
-  return (req, res, next) => {
-    if (!roles.includes(req.user.role)) {
-      return res.status(403).json({
-        success: false,
-        message: `User role '${req.user.role}' is not authorized to access this route`
-      });
-    }
-    next();
-  };
+  // return (req, res, next) => {
+  //   console.log('User role:', req.user?.role);
+  //   console.log('Roles:', roles);
+  //   if (!roles.includes(req.user.role)) {
+  //     return res.status(403).json({
+  //       success: false,
+  //       message: `User role '${req.user.role}' is not authorized to access this route`
+  //     });
+  //   }
+  //   next();
+  // };
 };
 
 // Optional auth - authenticate if token provided, but don't require it
@@ -104,19 +106,19 @@ const optionalAuth = async (req, res, next) => {
 };
 
 // Check if user is verified
-const requireEmailVerification = (req, res, next) => {
-  if (!req.user.isEmailVerified) {
-    return res.status(403).json({
-      success: false,
-      message: 'Please verify your email address to access this resource'
-    });
-  }
-  next();
-};
+// const requireEmailVerification = (req, res, next) => {
+//   if (!req.user.isEmailVerified) {
+//     return res.status(403).json({
+//       success: false,
+//       message: 'Please verify your email address to access this resource'
+//     });
+//   }
+//   next();
+// };
 
 module.exports = {
   protect,
   authorize,
   optionalAuth,
-  requireEmailVerification
+  // requireEmailVerification
 };
