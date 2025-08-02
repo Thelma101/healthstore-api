@@ -26,7 +26,7 @@ app.set('trust proxy', 1);
 
 // Security middleware
 // app.use(helmetConfig);
-app.use(cors);
+app.use(cors());
 // app.use(corsErrorHandler);
 // app.use(securityHeaders);
 // app.use(requestSizeLimit);

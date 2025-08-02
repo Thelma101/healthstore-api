@@ -1,5 +1,6 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const mongoose = require('mongoose');
 const User = require('../models/User'); // Use your existing model
 
 // ==== CONFIG ====
@@ -71,6 +72,11 @@ const register = async (req, res) => {
   try {
     const { firstName, lastName, email, password, phone, address } = req.body;
 
+    // Check if database is connected
+    if (mongoose.connection.readyState !== 1) {
+      return response.error(res, 'Database connection not available. Please try again later.', 503);
+    }
+
     const existingUser = await User.findOne({ email });
     if (existingUser) return response.conflict(res, 'User with this email already exists');
 
@@ -85,6 +91,11 @@ const register = async (req, res) => {
     if (error.code === 11000) {
       const field = Object.keys(error.keyPattern)[0];
       return response.conflict(res, `${field} already exists`);
+    }
+
+    // Check for database connection issues
+    if (error.name === 'MongoNetworkError' || error.name === 'MongoServerSelectionError') {
+      return response.error(res, 'Database connection error. Please try again later.', 503);
     }
 
     return response.error(res, 'Error registering user');
