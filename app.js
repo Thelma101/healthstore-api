@@ -59,13 +59,13 @@ app.get('/api', (req, res) => {
     message: 'Pharmacy Store API',
     version: '1.0.0',
     endpoints: {
-      auth: '/api/auth',
-      drugs: '/api/drugs',
-      categories: '/api/categories',
-      cart: '/api/cart',
-      orders: '/api/orders'
+      auth: '/api/v1/auth',
+      drugs: '/api/v1/drugs',
+      categories: '/api/v1/categories',
+      cart: '/api/v1/cart',
+      orders: '/api/v1/orders'
     },
-    documentation: '/api/docs'
+    documentation: '/api/v1/docs'
   });
 });
 
