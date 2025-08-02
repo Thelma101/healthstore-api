@@ -13,7 +13,7 @@ const server = app.listen(PORT, () => {
 🔗 Running on port ${PORT}
 🌍 Environment: ${process.env.NODE_ENV || 'development'}
 📊 Health check: http://localhost:${PORT}/health
-📚 API endpoints: http://localhost:${PORT}/api
+📚 API endpoints: http://localhost:${PORT}/api/v1
   `);
 });
 
