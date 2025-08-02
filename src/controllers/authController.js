@@ -1,268 +1,204 @@
-const User = require('../models/User');
-const { createTokenResponse } = require('../utils/jwt');
-const {
-  successResponse,
-  errorResponse,
-  createdResponse,
-  badRequestResponse,
-  unauthorizedResponse,
-  conflictResponse
-} = require('../utils/apiResponse');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const User = require('../models/User'); // Use your existing model
 
-// @desc    Register user
-// @route   POST /api/auth/register
-// @access  Public
+// ==== CONFIG ====
+const JWT_SECRET = process.env.JWT_SECRET || 'supersecretkey';
+const JWT_EXPIRES_IN = '7d';
+
+// ==== TOKEN + RESPONSE UTILS ====
+
+const createToken = user =>
+  jwt.sign({ id: user._id }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+
+const createTokenResponse = user => ({
+  token: createToken(user),
+  user: {
+    id: user._id,
+    email: user.email,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    phone: user.phone,
+    address: user.address,
+    role: user.role
+  }
+});
+
+const response = {
+  success: (res, data, msg = 'Success') =>
+    res.status(200).json({ success: true, message: msg, data }),
+
+  created: (res, data, msg = 'Created') =>
+    res.status(201).json({ success: true, message: msg, data }),
+
+  badRequest: (res, msg = 'Bad Request', errors = []) =>
+    res.status(400).json({ success: false, message: msg, errors }),
+
+  unauthorized: (res, msg = 'Unauthorized') =>
+    res.status(401).json({ success: false, message: msg }),
+
+  conflict: (res, msg = 'Conflict') =>
+    res.status(409).json({ success: false, message: msg }),
+
+  error: (res, msg = 'Server Error', code = 500) =>
+    res.status(code).json({ success: false, message: msg })
+};
+
+// ==== HELPERS ====
+
+const extractValidationErrors = error =>
+  Object.values(error.errors).map(err => ({
+    field: err.path,
+    message: err.message
+  }));
+
+const buildUserUpdates = body => {
+  const fields = ['firstName', 'lastName', 'phone', 'address'];
+  const updates = {};
+  for (const field of fields) {
+    if (body[field]) updates[field] = body[field];
+  }
+  return updates;
+};
+
+// ==== CONTROLLERS ====
+
 const register = async (req, res) => {
   try {
     const { firstName, lastName, email, password, phone, address } = req.body;
 
-    // Check if user already exists
     const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return conflictResponse(res, 'User with this email already exists');
-    }
+    if (existingUser) return response.conflict(res, 'User with this email already exists');
 
-    // Create user
-    const user = await User.create({
-      firstName,
-      lastName,
-      email,
-      password,
-      phone,
-      address
-    });
-
-    // Generate token response
-    const tokenResponse = createTokenResponse(user, true);
-
-    return createdResponse(res, tokenResponse, 'User registered successfully');
+    const user = await User.create({ firstName, lastName, email, password, phone, address });
+    return response.created(res, createTokenResponse(user), 'User registered successfully');
   } catch (error) {
     console.error('Register error:', error);
-    
-    // Handle mongoose validation errors
-    if (error.name === 'ValidationError') {
-      const errors = Object.values(error.errors).map(err => ({
-        field: err.path,
-        message: err.message
-      }));
-      return badRequestResponse(res, 'Validation error', errors);
-    }
 
-    // Handle duplicate key error
+    if (error.name === 'ValidationError')
+      return response.badRequest(res, 'Validation error', extractValidationErrors(error));
+
     if (error.code === 11000) {
       const field = Object.keys(error.keyPattern)[0];
-      return conflictResponse(res, `${field} already exists`);
+      return response.conflict(res, `${field} already exists`);
     }
 
-    return errorResponse(res, 'Error registering user', 500);
+    return response.error(res, 'Error registering user');
   }
 };
 
-// @desc    Login user
-// @route   POST /api/auth/login
-// @access  Public
 const login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // Check for user and include password field
     const user = await User.findOne({ email }).select('+password');
-    
-    if (!user) {
-      return unauthorizedResponse(res, 'Invalid email or password');
-    }
+    if (!user || !user.isActive)
+      return response.unauthorized(res, 'Invalid email or password');
 
-    // Check if user is active
-    if (!user.isActive) {
-      return unauthorizedResponse(res, 'Your account has been deactivated. Please contact support.');
-    }
+    const isMatch = await user.comparePassword(password);
+    if (!isMatch)
+      return response.unauthorized(res, 'Invalid email or password');
 
-    // Check password
-    const isPasswordMatch = await user.comparePassword(password);
-    
-    if (!isPasswordMatch) {
-      return unauthorizedResponse(res, 'Invalid email or password');
-    }
-
-    // Update last login
     user.lastLogin = new Date();
     await user.save({ validateBeforeSave: false });
 
-    // Generate token response
-    const tokenResponse = createTokenResponse(user, true);
-
-    return successResponse(res, tokenResponse, 'Login successful');
+    return response.success(res, createTokenResponse(user), 'Login successful');
   } catch (error) {
     console.error('Login error:', error);
-    return errorResponse(res, 'Error logging in', 500);
+    return response.error(res, 'Error logging in');
   }
 };
 
-// @desc    Get current logged in user
-// @route   GET /api/auth/me
-// @access  Private
 const getMe = async (req, res) => {
   try {
     const user = await User.findById(req.user.id);
-    
-    if (!user) {
-      return unauthorizedResponse(res, 'User not found');
-    }
-
-    return successResponse(res, { user }, 'User profile retrieved successfully');
+    if (!user) return response.unauthorized(res, 'User not found');
+    return response.success(res, { user }, 'User profile retrieved successfully');
   } catch (error) {
     console.error('Get me error:', error);
-    return errorResponse(res, 'Error retrieving user profile', 500);
+    return response.error(res, 'Error retrieving profile');
   }
 };
 
-// @desc    Update user profile
-// @route   PUT /api/auth/profile
-// @access  Private
 const updateProfile = async (req, res) => {
   try {
-    const fieldsToUpdate = {};
-    const allowedFields = ['firstName', 'lastName', 'phone', 'address'];
-    
-    // Only include allowed fields that are present in request
-    allowedFields.forEach(field => {
-      if (req.body[field] !== undefined) {
-        fieldsToUpdate[field] = req.body[field];
-      }
+    const updates = buildUserUpdates(req.body);
+    if (!Object.keys(updates).length)
+      return response.badRequest(res, 'No valid fields to update');
+
+    const user = await User.findByIdAndUpdate(req.user.id, updates, {
+      new: true,
+      runValidators: true
     });
 
-    if (Object.keys(fieldsToUpdate).length === 0) {
-      return badRequestResponse(res, 'No valid fields provided for update');
-    }
-
-    const user = await User.findByIdAndUpdate(
-      req.user.id,
-      fieldsToUpdate,
-      {
-        new: true,
-        runValidators: true
-      }
-    );
-
-    if (!user) {
-      return unauthorizedResponse(res, 'User not found');
-    }
-
-    return successResponse(res, { user }, 'Profile updated successfully');
+    if (!user) return response.unauthorized(res, 'User not found');
+    return response.success(res, { user }, 'Profile updated successfully');
   } catch (error) {
     console.error('Update profile error:', error);
-    
-    if (error.name === 'ValidationError') {
-      const errors = Object.values(error.errors).map(err => ({
-        field: err.path,
-        message: err.message
-      }));
-      return badRequestResponse(res, 'Validation error', errors);
-    }
 
-    return errorResponse(res, 'Error updating profile', 500);
+    if (error.name === 'ValidationError')
+      return response.badRequest(res, 'Validation error', extractValidationErrors(error));
+
+    return response.error(res, 'Error updating profile');
   }
 };
 
-// @desc    Change password
-// @route   PUT /api/auth/change-password
-// @access  Private
 const changePassword = async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword)
+      return response.badRequest(res, 'Both current and new passwords are required');
 
-    if (!currentPassword || !newPassword) {
-      return badRequestResponse(res, 'Current password and new password are required');
-    }
-
-    // Get user with password
     const user = await User.findById(req.user.id).select('+password');
-    
-    if (!user) {
-      return unauthorizedResponse(res, 'User not found');
-    }
+    if (!user) return response.unauthorized(res, 'User not found');
 
-    // Check current password
-    const isCurrentPasswordCorrect = await user.comparePassword(currentPassword);
-    
-    if (!isCurrentPasswordCorrect) {
-      return unauthorizedResponse(res, 'Current password is incorrect');
-    }
+    const isMatch = await user.comparePassword(currentPassword);
+    if (!isMatch)
+      return response.unauthorized(res, 'Current password is incorrect');
 
-    // Check if new password is different from current
-    const isSamePassword = await user.comparePassword(newPassword);
-    if (isSamePassword) {
-      return badRequestResponse(res, 'New password must be different from current password');
-    }
+    const isSame = await user.comparePassword(newPassword);
+    if (isSame)
+      return response.badRequest(res, 'New password must differ from current');
 
-    // Update password
     user.password = newPassword;
     await user.save();
 
-    return successResponse(res, null, 'Password changed successfully');
+    return response.success(res, null, 'Password changed successfully');
   } catch (error) {
     console.error('Change password error:', error);
-    
-    if (error.name === 'ValidationError') {
-      const errors = Object.values(error.errors).map(err => ({
-        field: err.path,
-        message: err.message
-      }));
-      return badRequestResponse(res, 'Validation error', errors);
-    }
-
-    return errorResponse(res, 'Error changing password', 500);
+    return response.error(res, 'Error changing password');
   }
 };
 
-// @desc    Logout user (client-side token removal)
-// @route   POST /api/auth/logout
-// @access  Private
-const logout = async (req, res) => {
+const logout = async (_req, res) => {
   try {
-    // In a stateless JWT system, logout is handled client-side by removing the token
-    // Here we can log the logout event or perform cleanup if needed
-    
-    return successResponse(res, null, 'Logged out successfully');
+    // In JWT-based systems, logout is typically handled on the client side.
+    return response.success(res, null, 'Logged out successfully');
   } catch (error) {
     console.error('Logout error:', error);
-    return errorResponse(res, 'Error logging out', 500);
+    return response.error(res, 'Error logging out');
   }
 };
 
-// @desc    Deactivate user account
-// @route   DELETE /api/auth/deactivate
-// @access  Private
 const deactivateAccount = async (req, res) => {
   try {
-    const { password, reason } = req.body;
+    const { password } = req.body;
+    if (!password) return response.badRequest(res, 'Password is required');
 
-    if (!password) {
-      return badRequestResponse(res, 'Password is required to deactivate account');
-    }
-
-    // Get user with password
     const user = await User.findById(req.user.id).select('+password');
-    
-    if (!user) {
-      return unauthorizedResponse(res, 'User not found');
-    }
+    if (!user) return response.unauthorized(res, 'User not found');
 
-    // Verify password
-    const isPasswordCorrect = await user.comparePassword(password);
-    
-    if (!isPasswordCorrect) {
-      return unauthorizedResponse(res, 'Incorrect password');
-    }
+    const isMatch = await user.comparePassword(password);
+    if (!isMatch)
+      return response.unauthorized(res, 'Incorrect password');
 
-    // Deactivate account
     user.isActive = false;
     await user.save({ validateBeforeSave: false });
 
-    return successResponse(res, null, 'Account deactivated successfully');
+    return response.success(res, null, 'Account deactivated successfully');
   } catch (error) {
     console.error('Deactivate account error:', error);
-    return errorResponse(res, 'Error deactivating account', 500);
+    return response.error(res, 'Error deactivating account');
   }
 };
 
