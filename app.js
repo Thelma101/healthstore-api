@@ -10,6 +10,7 @@ const path = require('path');
 // } = require('./src/middleware/security');
 
 // Route imports
+// const authRoutes = require('./src/routes/authRoute');
 const authRoutes = require('./src/routes/authRoute');
 
 // const drugRoutes = require('./src/routes/drugRoutes');
@@ -57,6 +58,15 @@ app.get('/health', (req, res) => {
     version: '1.0.0'
   });
 });
+
+
+
+app.get('/ping', (req, res) => {
+  res.send('pong');
+});
+
+
+
 
 // API documentation endpoint
 app.get('/api/v1', (req, res) => {
