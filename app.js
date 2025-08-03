@@ -18,15 +18,15 @@ const authRoutes = require('./src/routes/authRoute');
 // const orderRoutes = require('./src/routes/orderRoutes');
 
 const app = express();
-app.use(cors());
-
 
 // Trust proxy for rate limiting behind reverse proxy
 app.set('trust proxy', 1);
 
+// CORS middleware
+app.use(cors());
+
 // Security middleware
 // app.use(helmetConfig);
-app.use(cors());
 // app.use(corsErrorHandler);
 // app.use(securityHeaders);
 // app.use(requestSizeLimit);
