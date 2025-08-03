@@ -13,6 +13,7 @@ const app = express();
 // Route imports
 // const authRoutes = require('./src/routes/authRoute');
 const authRoutes = require('./src/routes/authRoute');
+const userRoutes = require('./src/routes/userRoutes');
 
 // const drugRoutes = require('./src/routes/drugRoutes');
 // const categoryRoutes = require('./src/routes/categoryRoutes');
@@ -57,6 +58,7 @@ app.use((req, res, next) => {
 
 // API routes
 app.use('/api/v1/auth', authRoutes);
+app.use('/api/v1/users', userRoutes);
 // app.use('/api/v1/drugs', drugRoutes);
 // app.use('/api/v1/categories', categoryRoutes);
 // app.use('/api/v1/cart', cartRoutes);
