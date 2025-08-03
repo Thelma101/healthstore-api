@@ -5,21 +5,21 @@ const router = express.Router();
 const {
   register,
   login,
-  getMe,
-  updateProfile,
-  changePassword,
-  logout,
-  deactivateAccount
+  // getMe,
+  // updateProfile,
+  // changePassword,
+  // logout,
+  // deactivateAccount
 } = require('../controllers/authController');
 
-const { protect } = require('../middleware/auth');
+// const { protect } = require('../middleware/auth');
 // const { authLimiter } = require('../middleware/security');
-const {
-  validateUserRegistration,
-  validateUserLogin,
-  validateUserUpdate,
-  handleValidationErrors
-} = require('../middleware/validation');
+// const {
+//   validateUserRegistration,
+//   validateUserLogin,
+//   validateUserUpdate,
+//   handleValidationErrors
+// } = require('../middleware/validation');
 
 // Public routes
 router.post('/register', 
@@ -71,27 +71,27 @@ router.get('/register', (req, res) => {
 
 
 router.post('/login', 
-//   authLimiter,
-  validateUserLogin,
-  handleValidationErrors,
+// authLimiter,
+//   validateUserLogin,
+//   handleValidationErrors,
   login
 );
 
 // Protected routes
-router.use(protect); // All routes after this require authentication
+// router.use(protect);
 
-router.get('/me', getMe);
+// router.get('/me', getMe);
 
-router.put('/profile', 
-  validateUserUpdate,
-  handleValidationErrors,
-  updateProfile
-);
+// router.put('/profile', 
+//   // validateUserUpdate,
+//   // handleValidationErrors,
+//   updateProfile
+// );
 
-router.put('/change-password', changePassword);
+// router.put('/change-password', changePassword);
 
-router.post('/logout', logout);
+// router.post('/logout', logout);
 
-router.delete('/deactivate', deactivateAccount);
+// router.delete('/deactivate', deactivateAccount);
 
 module.exports = router;
