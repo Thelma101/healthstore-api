@@ -1,47 +1,64 @@
-exports.success = (res, message, data = {}) => {
-  return res.status(200).json({ success: true, message, data });
-};
-
-exports.created = (res, message, data = {}) => {
-  return res.status(201).json({ success: true, message, data });
-};
-
-exports.conflict = (res, message) => {
-  return res.status(409).json({ success: false, message });
-};
-
-exports.unauthorized = (res, message) => {
-  return res.status(401).json({ success: false, message });
-};
-
-exports.forbidden = (res, message) => {
-  return res.status(403).json({ success: false, message });
-};
-
-exports.serverError = (res, message = 'Server error') => {
-  return res.status(500).json({ success: false, message });
-};
 
 
-exports.successResponse = (res, message, data = {}) => {
-  return res.status(200).json({
+// Success Responses
+const successResponse = (res, data, message = 'Success', statusCode = 200) => {
+  return res.status(statusCode).json({
     success: true,
     message,
     data
   });
 };
 
-exports.createdResponse = (res, message, data = {}) => {
-  return res.status(201).json({
-    success: true,
-    message,
-    data
-  });
+const createdResponse = (res, data, message = 'Resource created') => {
+  return successResponse(res, data, message, 201);
 };
 
-exports.errorResponse = (res, message, code = 500) => {
-  return res.status(code).json({
+const noContentResponse = (res) => {
+  return res.status(204).json();
+};
+
+// Error Responses
+const errorResponse = (res, message = 'Internal Server Error', statusCode = 500, errors = []) => {
+  return res.status(statusCode).json({
     success: false,
-    message
+    message,
+    errors
   });
+};
+
+const badRequestResponse = (res, message = 'Bad Request', errors = []) => {
+  return errorResponse(res, message, 400, errors);
+};
+
+const unauthorizedResponse = (res, message = 'Unauthorized') => {
+  return errorResponse(res, message, 401);
+};
+
+const forbiddenResponse = (res, message = 'Forbidden') => {
+  return errorResponse(res, message, 403);
+};
+
+const notFoundResponse = (res, message = 'Resource not found') => {
+  return errorResponse(res, message, 404);
+};
+
+const conflictResponse = (res, message = 'Resource already exists') => {
+  return errorResponse(res, message, 409);
+};
+
+const validationErrorResponse = (res, errors = [], message = 'Validation failed') => {
+  return badRequestResponse(res, message, errors);
+};
+
+module.exports = {
+  successResponse,
+  createdResponse,
+  noContentResponse,
+  errorResponse,
+  badRequestResponse,
+  unauthorizedResponse,
+  forbiddenResponse,
+  notFoundResponse,
+  conflictResponse,
+  validationErrorResponse
 };
