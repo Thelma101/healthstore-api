@@ -8,7 +8,7 @@ const PORT = process.env.PORT || 5001;
 connectDB();
 
 
-const server = app.listen(PORT, () => {
+  app.listen(PORT, () => {
   console.log(`
 🚀 Pharmacy Store API Server
 🔗 Running on port ${PORT}
@@ -18,7 +18,7 @@ const server = app.listen(PORT, () => {
   `);
 });
 
-exports = server;
+// exports = server;
 
 // // Handle unhandled promise rejections
 // process.on('unhandledRejection', (err, promise) => {
