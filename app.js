@@ -1,35 +1,18 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
-// const { 
-//   helmetConfig, 
-//   cors, 
-//   corsErrorHandler, 
-//   requestSizeLimit, 
-//   securityHeaders 
-// } = require('./src/middleware/security');
 
 // Route imports
 const authRoutes = require('./src/routes/authRoute');
 
-// const drugRoutes = require('./src/routes/drugRoutes');
-// const categoryRoutes = require('./src/routes/categoryRoutes');
-// const cartRoutes = require('./src/routes/cartRoutes');
-// const orderRoutes = require('./src/routes/orderRoutes');
-
 const app = express();
 
-// Trust proxy for rate limiting behind reverse proxy
-app.set('trust proxy', 1);
-
-// CORS middleware
-app.use(cors());
-
-// Security middleware
-// app.use(helmetConfig);
-// app.use(corsErrorHandler);
-// app.use(securityHeaders);
-// app.use(requestSizeLimit);
+// Basic CORS configuration
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
@@ -40,12 +23,6 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // API routes
 app.use('/api/v1/auth', authRoutes);
-// app.use('/api/v1/drugs', drugRoutes);
-// app.use('/api/v1/categories', categoryRoutes);
-// app.use('/api/v1/cart', cartRoutes);
-// app.use('/api/v1/orders', orderRoutes);
-
-
 
 // Health check endpoint
 app.get('/health', (req, res) => {

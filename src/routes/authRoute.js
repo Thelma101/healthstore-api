@@ -13,7 +13,6 @@ const {
 } = require('../controllers/authController');
 
 const { protect } = require('../middleware/auth');
-// const { authLimiter } = require('../middleware/security');
 const {
   validateUserRegistration,
   validateUserLogin,
@@ -21,13 +20,9 @@ const {
   handleValidationErrors
 } = require('../middleware/validation');
 
-// Public routes
-router.post('/register', 
-//   authLimiter,
-//   validateUserRegistration,
-//   handleValidationErrors,
-  register
-);
+// Public routes - NO MIDDLEWARE BLOCKING
+router.post('/register', register);
+router.post('/login', login);
 
 // GET route for registration info
 router.get('/register', (req, res) => {
@@ -69,28 +64,13 @@ router.get('/register', (req, res) => {
   });
 });
 
-router.post('/login', 
-//   authLimiter,
-  validateUserLogin,
-  handleValidationErrors,
-  login
-);
-
 // Protected routes
-router.use(protect); // All routes after this require authentication
+router.use(protect);
 
 router.get('/me', getMe);
-
-router.put('/profile', 
-  validateUserUpdate,
-  handleValidationErrors,
-  updateProfile
-);
-
+router.put('/profile', updateProfile);
 router.put('/change-password', changePassword);
-
 router.post('/logout', logout);
-
 router.delete('/deactivate', deactivateAccount);
 
 module.exports = router;
