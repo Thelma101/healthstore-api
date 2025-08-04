@@ -1,6 +1,8 @@
 const express = require('express');
 const cors = require('cors');
 const app = express();
+const routes = require('./routes');
+const { errorHandler } = require('./middleware/errorMiddleware');
 // const path = require('path');
 // const { 
 //   helmetConfig, 
@@ -12,8 +14,8 @@ const app = express();
 
 // Route imports
 // const authRoutes = require('./src/routes/authRoute');
-const authRoutes = require('./src/routes/authRoutes');
-const userRoutes = require('./src/routes/userRoutes');
+// const authRoutes = require('./src/routes/authRoutes');
+// const userRoutes = require('./src/routes/userRoutes');
 
 // const drugRoutes = require('./src/routes/drugRoutes');
 // const categoryRoutes = require('./src/routes/categoryRoutes');
@@ -23,6 +25,7 @@ const userRoutes = require('./src/routes/userRoutes');
 app.use(cors());
 app.use(express.json()); // ⬅️ This parses JSON request bodies
 app.use(express.urlencoded({ extended: true })); // Optional for form-encoded
+app.use(cookieParser());
 app.use((req, res, next) => {
   console.log(`[${req.method}] ${req.originalUrl}`);
   console.log('Body:', req.body);
@@ -56,19 +59,14 @@ app.use((req, res, next) => {
 // app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // API routes
-app.use('/api/v1/auth', authRoutes);
-app.use('/api/v1/users', userRoutes);
+// app.use('/api/v1/auth', authRoutes);
+// app.use('/api/v1/users', userRoutes);
 // app.use('/api/v1/drugs', drugRoutes);
 // app.use('/api/v1/categories', categoryRoutes);
 // app.use('/api/v1/cart', cartRoutes);
 // app.use('/api/v1/orders', orderRoutes);
 
-const express = require('express');
-const routes = require('./routes');
-const { errorHandler } = require('./middleware/errorMiddleware');
 
-
-app.use(cookieParser());
 
 // Routes
 app.use('/api/v1', routes);
