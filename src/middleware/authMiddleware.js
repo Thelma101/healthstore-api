@@ -1,55 +1,46 @@
 const jwt = require('jsonwebtoken');
-const asyncHandler = require('express-async-handler');
 const User = require('../models/userModel');
+const { unauthorizedResponse, forbiddenResponse } = require('../utils/apiResponse');
 
-const protect = asyncHandler(async (req, res, next) => {
-  let token;
-
-  // Check for token in cookies
-  if (req.cookies.jwt) {
-    token = req.cookies.jwt;
-  }
-  // Check for token in Authorization header
-  else if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
-    token = req.headers.authorization.split(' ')[1];
-  }
-
-  if (!token) {
-    res.status(401);
-    throw new Error('Not authorized, no token');
-  }
-
+exports.protect = async (req, res, next) => {
   try {
-    // Verify token
+    let token;
+    
+    if (req.headers.authorization?.startsWith('Bearer')) {
+      token = req.headers.authorization.split(' ')[1];
+    } else if (req.cookies.jwt) {
+      token = req.cookies.jwt;
+    }
+
+    if (!token) {
+      return unauthorizedResponse(res, 'Not authorized, no token');
+    }
+
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
-    // Get user from the token
-    req.user = await User.findById(decoded.id).select('-password');
-
-    if (!req.user) {
-      res.status(401);
-      throw new Error('Not authorized, user not found');
+    const currentUser = await User.findById(decoded.id).select('-password');
+    
+    if (!currentUser) {
+      return unauthorizedResponse(res, 'User not found');
     }
 
-    if (!req.user.isActive) {
-      res.status(401);
-      throw new Error('Not authorized, account is inactive');
+    if (currentUser.changedPasswordAfter(decoded.iat)) {
+      return unauthorizedResponse(res, 'Password changed, please log in again');
     }
 
+    req.user = currentUser;
     next();
   } catch (error) {
-    res.status(401);
-    throw new Error('Not authorized, token failed');
-  }
-});
-
-const admin = (req, res, next) => {
-  if (req.user && req.user.role === 'admin') {
-    next();
-  } else {
-    res.status(403);
-    throw new Error('Not authorized as an admin');
+    return unauthorizedResponse(res, error.message || 'Not authorized');
   }
 };
 
-module.exports = { protect, admin };
+exports.restrictTo = (...roles) => {
+  return (req, res, next) => {
+    if (!req.user || !roles.includes(req.user.role)) {
+      return forbiddenResponse(res, 'You do not have permission');
+    }
+    next();
+  };
+};
+
+exports.admin = exports.restrictTo('admin');

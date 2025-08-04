@@ -1,46 +1,61 @@
-// controllers/authController.js
-const User = require('../models/user');
-const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
-const apiResponse = require('../utils/apiResponse');
+const User = require('../models/userModel');
+const {
+  successResponse,
+  createdResponse,
+  unauthorizedResponse,
+  badRequestResponse,
+  notFoundResponse,
+  validationErrorResponse,
+  errorResponse,
+  conflictResponse
+} = require('../utils/apiResponse');
 
-const generateToken = (user) => {
-  return jwt.sign(
-    { id: user._id, role: user.role },
-    process.env.JWT_SECRET,
-    { expiresIn: '7d' }
-  );
+const signToken = (id) => {
+  return jwt.sign({ id }, process.env.JWT_SECRET, {
+    expiresIn: process.env.JWT_EXPIRES_IN
+  });
 };
 
-exports.register = async (req, res) => {
+const createSendToken = (user, statusCode, req, res) => {
+  const token = signToken(user._id);
+
+  res.cookie('jwt', token, {
+    expires: new Date(
+      Date.now() + process.env.JWT_COOKIE_EXPIRES_IN * 24 * 60 * 60 * 1000
+    ),
+    httpOnly: true,
+    secure: req.secure || req.headers['x-forwarded-proto'] === 'https'
+  });
+
+  user.password = undefined;
+
+  return successResponse(res, { user }, 'Authentication successful', statusCode);
+};
+
+exports.signup = async (req, res) => {
   try {
-    const { firstName, lastName, email, password, phone, address } = req.body;
-
-    if (await User.findOne({ email }))
-      return apiResponse.conflict(res, 'Email already registered');
-
-    const user = await User.create({
-      firstName,
-      lastName,
-      email,
-      password: await bcrypt.hash(password, 12),
-      phone,
-      address
+    const newUser = await User.create({
+      firstName: req.body.firstName,
+      lastName: req.body.lastName,
+      email: req.body.email,
+      password: req.body.password,
+      phone: req.body.phone
     });
 
-    const token = generateToken(user);
+    const verificationToken = newUser.createEmailVerificationToken();
+    await newUser.save({ validateBeforeSave: false });
 
-    return apiResponse.created(res, 'Registration successful', {
-      token,
-      user: {
-        id: user._id,
-        email: user.email,
-        role: user.role
-      }
-    });
+    // TODO: Send verification email
+    console.log(`Verification token: ${verificationToken}`);
+
+    return createdResponse(res, { user: newUser }, 'User created successfully');
   } catch (err) {
-    console.error('[Register Error]', err.message);
-    return apiResponse.serverError(res, 'Failed to register user');
+    if (err.code === 11000) {
+      return conflictResponse(res, 'Email already exists');
+    }
+    return errorResponse(res, err.message);
   }
 };
 
@@ -48,252 +63,93 @@ exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
+    if (!email || !password) {
+      return validationErrorResponse(res, ['Email and password are required']);
+    }
+
     const user = await User.findOne({ email }).select('+password');
-    if (!user) return apiResponse.unauthorized(res, 'Invalid email or password');
 
-    const isValid = await bcrypt.compare(password, user.password);
-    if (!isValid) return apiResponse.unauthorized(res, 'Invalid email or password');
+    if (!user || !(await user.correctPassword(password, user.password))) {
+      return unauthorizedResponse(res, 'Incorrect email or password');
+    }
 
-    const token = generateToken(user);
-    user.lastLogin = Date.now();
-    await user.save();
+    if (!user.isEmailVerified) {
+      return unauthorizedResponse(res, 'Please verify your email first');
+    }
 
-    return apiResponse.success(res, 'Login successful', {
-      token,
-      user: {
-        id: user._id,
-        email: user.email,
-        role: user.role
-      }
-    });
+    return createSendToken(user, 200, req, res);
   } catch (err) {
-    console.error('[Login Error]', err.message);
-    return apiResponse.serverError(res, 'Failed to login');
+    return errorResponse(res, err.message);
   }
 };
 
+exports.logout = (req, res) => {
+  res.cookie('jwt', 'loggedout', {
+    expires: new Date(Date.now() + 10 * 1000),
+    httpOnly: true
+  });
+  return successResponse(res, null, 'Logged out successfully');
+};
 
+exports.forgotPassword = async (req, res) => {
+  try {
+    const user = await User.findOne({ email: req.body.email });
+    if (!user) {
+      return notFoundResponse(res, 'User not found with that email');
+    }
 
+    const resetToken = user.createPasswordResetToken();
+    await user.save({ validateBeforeSave: false });
 
+    // TODO: Send password reset email
+    console.log(`Reset token: ${resetToken}`);
 
-// const bcrypt = require('bcryptjs');
-// const jwt = require('jsonwebtoken');
-// const User = require('../models/User'); // Use your existing model
+    return successResponse(res, null, 'Password reset token sent to email');
+  } catch (err) {
+    return errorResponse(res, err.message);
+  }
+};
 
-// // ==== CONFIG ====
-// const JWT_SECRET = process.env.JWT_SECRET || 'supersecretkey';
-// const JWT_EXPIRES_IN = '7d';
+exports.resetPassword = async (req, res) => {
+  try {
+    const hashedToken = crypto
+      .createHash('sha256')
+      .update(req.params.token)
+      .digest('hex');
 
-// // ==== TOKEN + RESPONSE UTILS ====
+    const user = await User.findOne({
+      passwordResetToken: hashedToken,
+      passwordResetExpire: { $gt: Date.now() }
+    });
 
-// const createToken = user =>
-//   jwt.sign({ id: user._id }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+    if (!user) {
+      return badRequestResponse(res, 'Token is invalid or has expired');
+    }
 
-// const createTokenResponse = user => ({
-//   token: createToken(user),
-//   user: {
-//     id: user._id,
-//     email: user.email,
-//     firstName: user.firstName,
-//     lastName: user.lastName,
-//     phone: user.phone,
-//     address: user.address,
-//     role: user.role
-//   }
-// });
+    user.password = req.body.password;
+    user.passwordResetToken = undefined;
+    user.passwordResetExpire = undefined;
+    await user.save();
 
-// const response = {
-//   success: (res, data, msg = 'Success') =>
-//     res.status(200).json({ success: true, message: msg, data }),
+    return createSendToken(user, 200, req, res);
+  } catch (err) {
+    return errorResponse(res, err.message);
+  }
+};
 
-//   created: (res, data, msg = 'Created') =>
-//     res.status(201).json({ success: true, message: msg, data }),
+exports.updatePassword = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select('+password');
 
-//   badRequest: (res, msg = 'Bad Request', errors = []) =>
-//     res.status(400).json({ success: false, message: msg, errors }),
+    if (!(await user.correctPassword(req.body.currentPassword, user.password))) {
+      return unauthorizedResponse(res, 'Your current password is wrong');
+    }
 
-//   unauthorized: (res, msg = 'Unauthorized') =>
-//     res.status(401).json({ success: false, message: msg }),
+    user.password = req.body.newPassword;
+    await user.save();
 
-//   conflict: (res, msg = 'Conflict') =>
-//     res.status(409).json({ success: false, message: msg }),
-
-//   error: (res, msg = 'Server Error', code = 500) =>
-//     res.status(code).json({ success: false, message: msg }),
-
-//   403: (res, msg = 'Server Error', code = 403) =>
-//     res.status(code).json({ success: false, message: msg }),
-
-//   forbidden: (res, msg = 'Forbidden') =>
-//   res.status(403).json({ success: false, message: msg }),
-
-  
-// };
-
-// // ==== HELPERS ====
-
-// const extractValidationErrors = error =>
-//   Object.values(error.errors).map(err => ({
-//     field: err.path,
-//     message: err.message
-//   }));
-
-// const buildUserUpdates = body => {
-//   const fields = ['firstName', 'lastName', 'phone', 'address'];
-//   const updates = {};
-//   for (const field of fields) {
-//     if (body[field]) updates[field] = body[field];
-//   }
-//   return updates;
-// };
-
-// // ==== CONTROLLERS ====
-
-// const register = async (req, res) => {
-//   try {
-//     const { firstName, lastName, email, password, phone, address } = req.body;
-
-//     const existingUser = await User.findOne({ email });
-//     if (existingUser) return response.conflict(res, 'User with this email already exists');
-
-//     const user = await User.create({ firstName, lastName, email, password, phone, address });
-//     return response.created(res, createTokenResponse(user), 'User registered successfully');
-//   } catch (error) {
-//     console.error('Register error:', error);
-
-//     if (error.name === 'ValidationError')
-//       return response.badRequest(res, 'Validation error', extractValidationErrors(error));
-
-//     if (error.code === 11000) {
-//       const field = Object.keys(error.keyPattern)[0];
-//       return response.conflict(res, `${field} already exists`);
-//     }
-
-//     return response.error(res, 'Error registering user');
-//   }
-// };
-
-// const login = async (req, res) => {
-//   try {
-//     const { email, password } = req.body;
-
-//     const user = await User.findOne({ email }).select('+password');
-//     if (!user || !user.isActive)
-//       return response.unauthorized(res, 'Invalid email or password');
-
-//     const isMatch = await user.comparePassword(password);
-//     if (!isMatch)
-//       return response.unauthorized(res, 'Invalid email or password');
-
-//     user.lastLogin = new Date();
-//     await user.save({ validateBeforeSave: false });
-
-//     return response.success(res, createTokenResponse(user), 'Login successful');
-//   } catch (error) {
-//     console.error('Login error:', error);
-//     return response.error(res, 'Error logging in');
-//   }
-// };
-
-// const getMe = async (req, res) => {
-//   try {
-//     const user = await User.findById(req.user.id);
-//     if (!user) return response.unauthorized(res, 'User not found');
-//     return response.success(res, { user }, 'User profile retrieved successfully');
-//   } catch (error) {
-//     console.error('Get me error:', error);
-//     return response.error(res, 'Error retrieving profile');
-//   }
-// };
-
-// const updateProfile = async (req, res) => {
-//   try {
-//     const updates = buildUserUpdates(req.body);
-//     if (!Object.keys(updates).length)
-//       return response.badRequest(res, 'No valid fields to update');
-
-//     const user = await User.findByIdAndUpdate(req.user.id, updates, {
-//       new: true,
-//       runValidators: true
-//     });
-
-//     if (!user) return response.unauthorized(res, 'User not found');
-//     return response.success(res, { user }, 'Profile updated successfully');
-//   } catch (error) {
-//     console.error('Update profile error:', error);
-
-//     if (error.name === 'ValidationError')
-//       return response.badRequest(res, 'Validation error', extractValidationErrors(error));
-
-//     return response.error(res, 'Error updating profile');
-//   }
-// };
-
-// const changePassword = async (req, res) => {
-//   try {
-//     const { currentPassword, newPassword } = req.body;
-//     if (!currentPassword || !newPassword)
-//       return response.badRequest(res, 'Both current and new passwords are required');
-
-//     const user = await User.findById(req.user.id).select('+password');
-//     if (!user) return response.unauthorized(res, 'User not found');
-
-//     const isMatch = await user.comparePassword(currentPassword);
-//     if (!isMatch)
-//       return response.unauthorized(res, 'Current password is incorrect');
-
-//     const isSame = await user.comparePassword(newPassword);
-//     if (isSame)
-//       return response.badRequest(res, 'New password must differ from current');
-
-//     user.password = newPassword;
-//     await user.save();
-
-//     return response.success(res, null, 'Password changed successfully');
-//   } catch (error) {
-//     console.error('Change password error:', error);
-//     return response.error(res, 'Error changing password');
-//   }
-// };
-
-// const logout = async (_req, res) => {
-//   try {
-//     // In JWT-based systems, logout is typically handled on the client side.
-//     return response.success(res, null, 'Logged out successfully');
-//   } catch (error) {
-//     console.error('Logout error:', error);
-//     return response.error(res, 'Error logging out');
-//   }
-// };
-
-// const deactivateAccount = async (req, res) => {
-//   try {
-//     const { password } = req.body;
-//     if (!password) return response.badRequest(res, 'Password is required');
-
-//     const user = await User.findById(req.user.id).select('+password');
-//     if (!user) return response.unauthorized(res, 'User not found');
-
-//     const isMatch = await user.comparePassword(password);
-//     if (!isMatch)
-//       return response.unauthorized(res, 'Incorrect password');
-
-//     user.isActive = false;
-//     await user.save({ validateBeforeSave: false });
-
-//     return response.success(res, null, 'Account deactivated successfully');
-//   } catch (error) {
-//     console.error('Deactivate account error:', error);
-//     return response.error(res, 'Error deactivating account');
-//   }
-// };
-
-// module.exports = {
-//   register,
-//   login,
-//   getMe,
-//   updateProfile,
-//   changePassword,
-//   logout,
-//   deactivateAccount
-// };
+    return createSendToken(user, 200, req, res);
+  } catch (err) {
+    return errorResponse(res, err.message);
+  }
+};

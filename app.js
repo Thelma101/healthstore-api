@@ -12,14 +12,13 @@ const app = express();
 
 // Route imports
 // const authRoutes = require('./src/routes/authRoute');
-const authRoutes = require('./src/routes/authRoute');
+const authRoutes = require('./src/routes/authRoutes');
 const userRoutes = require('./src/routes/userRoutes');
 
 // const drugRoutes = require('./src/routes/drugRoutes');
 // const categoryRoutes = require('./src/routes/categoryRoutes');
 // const cartRoutes = require('./src/routes/cartRoutes');
 // const orderRoutes = require('./src/routes/orderRoutes');
-
 
 app.use(cors());
 app.use(express.json()); // ⬅️ This parses JSON request bodies
