@@ -63,7 +63,18 @@ app.use('/api/v1/users', userRoutes);
 // app.use('/api/v1/cart', cartRoutes);
 // app.use('/api/v1/orders', orderRoutes);
 
+const express = require('express');
+const routes = require('./routes');
+const { errorHandler } = require('./middleware/errorMiddleware');
 
+
+app.use(cookieParser());
+
+// Routes
+app.use('/api/v1', routes);
+
+
+app.use(errorHandler);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
