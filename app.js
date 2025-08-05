@@ -4,8 +4,8 @@ const rateLimit = require('express-rate-limit');
 const helmet = require('helmet');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
-const routes = require('./routes');
-const { errorHandler } = require('./middleware/errorMiddleware');
+const routes = require('./src/routes/mainRoute');
+const { errorHandler } = require('./src//middleware/errorMiddleware');
 
 const app = express();
 
