@@ -83,7 +83,10 @@ exports.signup = async (req, res) => {
     await newUser.save({ validateBeforeSave: false });
 
     // 5) Send verification email
-    await sendVerificationEmail(newUser.email, verificationToken);
+    // await sendVerificationEmail(newUser.email, verificationToken);
+    console.log(`Verification token: ${verificationToken}`);
+    console.log(`Verification URL: ${process.env.CLIENT_URL}/verify-email/${verificationToken}`);
+    
 
     // 6) Format response
     return res.status(201).json({

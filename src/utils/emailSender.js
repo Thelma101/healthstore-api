@@ -4,7 +4,7 @@ sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 const sendVerificationEmail = async (email, token) => {
     const msg = {
         to: email,
-        from: 'no-reply@gmail.com', // Use a verified sender
+        from: 'akpata.thelma@gmail.com', // Use a verified sender
         subject: 'Verify Your Email',
         text: `Your verification token: ${token}`,
         html: `<strong>Verify here: <a href="http://yourapp.com/verify?token=${token}">Click</a></strong>`,
