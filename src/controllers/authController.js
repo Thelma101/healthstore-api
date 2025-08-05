@@ -131,23 +131,84 @@ exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
+    // 1) Validate input
     if (!email || !password) {
-      return validationErrorResponse(res, ['Email and password are required']);
+      return res.status(400).json({
+        success: false,
+        message: 'Validation failed',
+        errors: [
+          { field: 'email', message: 'Email is required' },
+          { field: 'password', message: 'Password is required' }
+        ]
+      });
     }
 
+    // 2) Check if user exists
     const user = await User.findOne({ email }).select('+password');
-
-    if (!user || !(await user.correctPassword(password, user.password))) {
-      return unauthorizedResponse(res, 'Incorrect email or password');
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication failed',
+        errors: [{ 
+          field: 'email', 
+          message: 'Invalid email or password' 
+        }]
+      });
     }
 
+    // 3) Verify password
+    const isPasswordValid = await user.verifyPassword(password);
+    if (!isPasswordValid) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication failed',
+        errors: [{ 
+          field: 'password', 
+          message: 'Invalid email or password' 
+        }]
+      });
+    }
+
+    // 4) Check if email is verified
     if (!user.isEmailVerified) {
-      return unauthorizedResponse(res, 'Please verify your email first');
+      return res.status(403).json({
+        success: false,
+        message: 'Authentication failed',
+        errors: [{ 
+          field: 'email', 
+          message: 'Please verify your email first' 
+        }]
+      });
     }
 
-    return createSendToken(user, 200, req, res);
+    // 5) Generate token
+    const token = user.generateAuthToken();
+
+    // 6) Update last login
+    user.lastLogin = Date.now();
+    await user.save({ validateBeforeSave: false });
+
+    // 7) Format response
+    return res.status(200).json({
+      success: true,
+      message: 'Login successful',
+      data: {
+        token,
+        user: {
+          id: user._id,
+          firstName: user.firstName,
+          email: user.email,
+          role: user.role
+        }
+      }
+    });
+
   } catch (err) {
-    return errorResponse(res, err.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Login failed',
+      errors: [{ message: err.message }]
+    });
   }
 };
 
