@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 const validator = require('validator');
 
 const userSchema = new mongoose.Schema({
@@ -10,9 +11,9 @@ const userSchema = new mongoose.Schema({
     maxlength: [50, 'First name cannot exceed 50 characters'],
     validate: {
       validator: function(v) {
-        return /^[a-zA-Z]+$/.test(v);
+        return /^[a-zA-Z\s-']+$/.test(v);
       },
-      message: 'First name should contain only letters'
+      message: 'First name contains invalid characters'
     }
   },
   lastName: {
@@ -22,9 +23,9 @@ const userSchema = new mongoose.Schema({
     maxlength: [50, 'Last name cannot exceed 50 characters'],
     validate: {
       validator: function(v) {
-        return /^[a-zA-Z]+$/.test(v);
+        return /^[a-zA-Z\s-']+$/.test(v);
       },
-      message: 'Last name should contain only letters'
+      message: 'Last name contains invalid characters'
     }
   },
   email: {
@@ -42,11 +43,12 @@ const userSchema = new mongoose.Schema({
     select: false,
     validate: {
       validator: function(v) {
-        return /^(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[!@#$%^&*]).{8,}$/.test(v);
+        return /^(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{8,}$/.test(v);
       },
-      message: 'Password must contain at least one uppercase, one lowercase, one number and one special character'
+      message: 'Password must contain at least one uppercase, one lowercase, and one number'
     }
   },
+
   phone: {
     type: String,
     required: [true, 'Phone number is required'],
@@ -191,5 +193,48 @@ userSchema.methods.createPasswordResetToken = function() {
 userSchema.virtual('fullName').get(function() {
   return `${this.firstName} ${this.lastName}`;
 });
+
+
+userSchema.methods.createEmailVerificationToken = function() {
+  if (!this._id) throw new Error('User must be saved before generating token');
+  
+  const verificationToken = crypto.randomBytes(32).toString('hex');
+  
+  this.emailVerificationToken = crypto
+    .createHash('sha256')
+    .update(verificationToken)
+    .digest('hex');
+  
+  this.emailVerificationExpire = Date.now() + 24 * 60 * 60 * 1000; // 24 hours
+  
+  return verificationToken;
+};
+
+// Enhanced duplicate email error handling
+userSchema.post('save', function(error, doc, next) {
+  if (error.name === 'MongoError' && error.code === 11000) {
+    next(new Error('Email address is already registered'));
+  } else {
+    next(error);
+  }
+});
+
+// Password hash middleware
+userSchema.pre('save', async function(next) {
+  if (!this.isModified('password')) return next();
+  
+  try {
+    this.password = await bcrypt.hash(this.password, 12);
+    next();
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Password verification
+userSchema.methods.verifyPassword = async function(candidatePassword) {
+  return await bcrypt.compare(candidatePassword, this.password);
+};
+
 
 module.exports = mongoose.model('User', userSchema);
