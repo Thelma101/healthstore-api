@@ -34,28 +34,79 @@ const createSendToken = (user, statusCode, req, res) => {
   return successResponse(res, { user }, 'Authentication successful', statusCode);
 };
 
+
+
 exports.signup = async (req, res) => {
   try {
+
+    //     if (!validator.isEmail(req.body.email)) {
+    //   return res.status(400).json({
+    //     success: false,
+    //     message: 'Validation failed',
+    //     errors: [{ field: 'email', message: 'Invalid email format' }]
+    //   });
+    // }
+
+    const existingUser = await User.findOne({ email: req.body.email });
+    if (existingUser) {
+      return res.status(409).json({
+        success: false,
+        message: 'Email already exists',
+        errors: [{ field: 'email', message: 'Email already registered' }]
+      });
+    }
+    const { firstName, lastName, email, password, phone } = req.body;
+
+
     const newUser = await User.create({
-      firstName: req.body.firstName,
-      lastName: req.body.lastName,
-      email: req.body.email,
-      password: req.body.password,
-      phone: req.body.phone
+      firstName,
+      lastName,
+      email,
+      password,
+      phone
     });
 
+    // 2) Generate verification token
     const verificationToken = newUser.createEmailVerificationToken();
     await newUser.save({ validateBeforeSave: false });
 
-    // TODO: Send verification email
+    // 3) Send verification email (implementation depends on your email service)
+    // await sendVerificationEmail(newUser.email, verificationToken);
+console.log(`Verification token: ${verificationToken}`);
+
     console.log(`Verification token: ${verificationToken}`);
 
-    return createdResponse(res, { user: newUser }, 'User created successfully');
+  
+    // 4) Respond without sensitive data
+    const userResponse = {
+      id: newUser._id,
+      firstName: newUser.firstName,
+      email: newUser.email,
+      phone: newUser.phone
+    };
+
+    return res.status(201).json({
+      success: true,
+      message: 'User registered successfully. Verification email sent.',
+      data: userResponse
+    });
+
   } catch (err) {
-    if (err.code === 11000) {
-      return conflictResponse(res, 'Email already exists');
+    // Handle duplicate email error specifically
+    if (err.message.includes('already registered')) {
+      return res.status(409).json({
+        success: false,
+        message: err.message,
+        errors: [{ field: 'email', message: err.message }]
+      });
     }
-    return errorResponse(res, err.message);
+
+    // Handle other errors
+    return res.status(400).json({
+      success: false,
+      message: 'Registration failed',
+      errors: [{ message: err.message }]
+    });
   }
 };
 
