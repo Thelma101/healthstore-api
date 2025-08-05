@@ -4,237 +4,160 @@ const crypto = require('crypto');
 const validator = require('validator');
 
 const userSchema = new mongoose.Schema({
-  firstName: {
-    type: String,
-    required: [true, 'First name is required'],
-    trim: true,
-    maxlength: [50, 'First name cannot exceed 50 characters'],
-    validate: {
-      validator: function(v) {
-        return /^[a-zA-Z\s-']+$/.test(v);
-      },
-      message: 'First name contains invalid characters'
-    }
-  },
-  lastName: {
-    type: String,
-    required: [true, 'Last name is required'],
-    trim: true,
-    maxlength: [50, 'Last name cannot exceed 50 characters'],
-    validate: {
-      validator: function(v) {
-        return /^[a-zA-Z\s-']+$/.test(v);
-      },
-      message: 'Last name contains invalid characters'
-    }
-  },
-  email: {
-    type: String,
-    required: [true, 'Email is required'],
-    unique: true,
-    lowercase: true,
-    validate: [validator.isEmail, 'Please provide a valid email'],
-    index: true
-  },
-  password: {
-    type: String,
-    required: [true, 'Password is required'],
-    minlength: [8, 'Password must be at least 8 characters'],
-    select: false,
-    validate: {
-      validator: function(v) {
-        return /^(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{8,}$/.test(v);
-      },
-      message: 'Password must contain at least one uppercase, one lowercase, and one number'
-    }
-  },
-
-  phone: {
-    type: String,
-    required: [true, 'Phone number is required'],
-    validate: {
-      validator: function(v) {
-        return /^\+?[\d\s-()]{10,15}$/.test(v);
-      },
-      message: 'Please enter a valid phone number (10-15 digits)'
+    firstName: {
+        type: String,
+        required: [true, 'First name is required'],
+        trim: true,
+        maxlength: [50, 'First name cannot exceed 50 characters'],
+        validate: {
+            validator: (v) => /^[a-zA-Z\s-']+$/.test(v),
+            message: 'First name contains invalid characters'
+        }
     },
-    index: true
-  },
-  address: {
-    street: { 
-      type: String,
-      trim: true,
-      maxlength: [100, 'Street address cannot exceed 100 characters']
+    lastName: {
+        type: String,
+        required: [true, 'Last name is required'],
+        trim: true,
+        maxlength: [50, 'Last name cannot exceed 50 characters'],
+        validate: {
+            validator: (v) => /^[a-zA-Z\s-']+$/.test(v),
+            message: 'Last name contains invalid characters'
+        }
     },
-    city: {
-      type: String,
-      trim: true,
-      maxlength: [50, 'City name cannot exceed 50 characters']
+    email: {
+        type: String,
+        required: [true, 'Email is required'],
+        unique: true,
+        lowercase: true,
+        validate: [validator.isEmail, 'Please provide a valid email'],
+        index: true
     },
-    state: {
-      type: String,
-      trim: true,
-      maxlength: [50, 'State name cannot exceed 50 characters']
+    password: {
+        type: String,
+        required: [true, 'Password is required'],
+        minlength: [8, 'Password must be at least 8 characters'],
+        select: false,
+        validate: {
+            validator: (v) => /^(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{8,}$/.test(v),
+            message: 'Password must contain at least one uppercase, one lowercase, and one number'
+        }
     },
-    zipCode: {
-      type: String,
-      trim: true,
-      validate: {
-        validator: function(v) {
-          return /^[0-9]{5,10}(?:-[0-9]{4})?$/.test(v);
-        },
-        message: 'Please enter a valid zip/postal code'
-      }
+    // passwordConfirm: {
+    //     type: String,
+    //     required: [true, 'Please confirm your password'],
+    //     validate: {
+    //         validator: function (el) {
+    //             return el === this.password;
+    //         },
+    //         message: 'Passwords do not match'
+    //     },
+    //     select: false
+    // },
+    phone: {
+        type: String,
+        required: [true, 'Phone number is required'],
+        validate: {
+            validator: (v) => /^\+?[\d\s-()]{10,15}$/.test(v),
+            message: 'Please enter a valid phone number (10-15 digits)'
+        }
     },
-    country: {
-      type: String,
-      default: 'Nigeria',
-      trim: true
+    address: {
+        street: { type: String, trim: true, maxlength: 100 },
+        city: { type: String, trim: true, maxlength: 50 },
+        state: { type: String, trim: true, maxlength: 50 },
+        country: { type: String, default: 'Nigeria', trim: true },
+        coordinates: { type: [Number], index: '2dsphere' }
     },
-    coordinates: {
-      // For potential delivery tracking
-      type: [Number], // [longitude, latitude]
-      index: '2dsphere'
-    }
-  },
-  role: {
-    type: String,
-    enum: {
-      values: ['user', 'admin', 'pharmacist'],
-      message: 'Role is either: user, admin, or pharmacist'
+    role: {
+        type: String,
+        enum: ['user', 'admin', 'pharmacist'],
+        default: 'user'
     },
-    default: 'user'
-  },
-  profileImage: {
-    type: String,
-    default: 'default.jpg'
-  },
-  isEmailVerified: {
-    type: Boolean,
-    default: false
-  },
-  isActive: {
-    type: Boolean,
-    default: true,
-    select: false
-  },
-  lastLogin: {
-    type: Date
-  },
-  loginHistory: [{
-    timestamp: Date,
-    ipAddress: String,
-    userAgent: String
-  }],
-  favorites: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Drug'
-  }],
-  resetPasswordToken: String,
-  resetPasswordExpire: Date,
-  emailVerificationToken: String,
-  emailVerificationExpire: Date,
-  twoFactorEnabled: {
-    type: Boolean,
-    default: false
-  },
-  twoFactorSecret: String,
-  metadata: mongoose.Schema.Types.Mixed // For any additional custom fields
+    profileImage: { type: String, default: 'default.jpg' },
+    isEmailVerified: { type: Boolean, default: false },
+    isActive: { type: Boolean, default: true, select: false },
+    passwordChangedAt: Date, // Added for password change tracking
+    resetPasswordToken: String,
+    resetPasswordExpire: Date,
+    emailVerificationToken: String,
+    emailVerificationExpire: Date
 }, {
-  timestamps: true,
-  toJSON: { virtuals: true },
-  toObject: { virtuals: true }
+    timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true }
 });
 
-// Indexes
-userSchema.index({ email: 1 }, { unique: true });
-userSchema.index({ 'address.coordinates': '2dsphere' });
+// Password handling middleware
+userSchema.pre('save', async function (next) {
+    if (!this.isModified('password')) return next();
 
-// Document middleware
-userSchema.pre('save', async function(next) {
-  if (!this.isModified('password')) return next();
-  
-  this.password = await bcrypt.hash(this.password, 12);
-  next();
+    this.password = await bcrypt.hash(this.password, 12);
+    this.passwordConfirm = undefined;
+    this.passwordChangedAt = Date.now() - 1000; // 1 second in past to ensure token created after
+    next();
 });
 
-userSchema.pre(/^find/, function(next) {
-  this.find({ isActive: { $ne: false } });
-  next();
+// Query middleware to filter inactive users
+userSchema.pre(/^find/, function (next) {
+    this.find({ isActive: { $ne: false } });
+    next();
 });
 
 // Instance methods
-userSchema.methods.correctPassword = async function(candidatePassword, userPassword) {
-  return await bcrypt.compare(candidatePassword, userPassword);
+userSchema.methods = {
+    verifyPassword: async function (candidatePassword) {
+        return await bcrypt.compare(candidatePassword, this.password);
+    },
+
+    changedPasswordAfter: function (JWTTimestamp) {
+        if (this.passwordChangedAt) {
+            return JWTTimestamp < parseInt(this.passwordChangedAt.getTime() / 1000, 10);
+        }
+        return false;
+    },
+
+    createPasswordResetToken: function () {
+        const resetToken = crypto.randomBytes(32).toString('hex');
+
+        this.resetPasswordToken = crypto
+            .createHash('sha256')
+            .update(resetToken)
+            .digest('hex');
+
+        this.resetPasswordExpire = Date.now() + 10 * 60 * 1000;
+
+        return resetToken;
+    },
+
+    createEmailVerificationToken: function () {
+        const verificationToken = crypto.randomBytes(32).toString('hex');
+
+        this.emailVerificationToken = crypto
+            .createHash('sha256')
+            .update(verificationToken)
+            .digest('hex');
+
+        this.emailVerificationExpire = Date.now() + 24 * 60 * 60 * 1000;
+
+        return verificationToken;
+    }
 };
 
-userSchema.methods.changedPasswordAfter = function(JWTTimestamp) {
-  if (this.passwordChangedAt) {
-    const changedTimestamp = parseInt(this.passwordChangedAt.getTime() / 1000, 10);
-    return JWTTimestamp < changedTimestamp;
-  }
-  return false;
-};
+// Virtual
+userSchema.virtual('fullName').get(function () {
+    return `${this.firstName} ${this.lastName}`;
+});
 
-userSchema.methods.createPasswordResetToken = function() {
-  const resetToken = crypto.randomBytes(32).toString('hex');
-  
-  this.resetPasswordToken = crypto
-    .createHash('sha256')
-    .update(resetToken)
-    .digest('hex');
-  
-  this.resetPasswordExpire = Date.now() + 10 * 60 * 1000; // 10 minutes
-  
-  return resetToken;
-};
-
-// Virtuals
-userSchema.virtual('fullName').get(function() {
-  return `${this.firstName} ${this.lastName}`;
+// Error handling
+userSchema.post('save', function (error, doc, next) {
+    if (error.name === 'MongoServerError' && error.code === 11000) {
+        next(new Error('Email address is already registered'));
+    } else {
+        next(error);
+    }
 });
 
 
-userSchema.methods.createEmailVerificationToken = function() {
-  if (!this._id) throw new Error('User must be saved before generating token');
-  
-  const verificationToken = crypto.randomBytes(32).toString('hex');
-  
-  this.emailVerificationToken = crypto
-    .createHash('sha256')
-    .update(verificationToken)
-    .digest('hex');
-  
-  this.emailVerificationExpire = Date.now() + 24 * 60 * 60 * 1000; // 24 hours
-  
-  return verificationToken;
-};
-
-// Enhanced duplicate email error handling
-userSchema.post('save', function(error, doc, next) {
-  if (error.name === 'MongoError' && error.code === 11000) {
-    next(new Error('Email address is already registered'));
-  } else {
-    next(error);
-  }
-});
-
-// Password hash middleware
-userSchema.pre('save', async function(next) {
-  if (!this.isModified('password')) return next();
-  
-  try {
-    this.password = await bcrypt.hash(this.password, 12);
-    next();
-  } catch (err) {
-    next(err);
-  }
-});
-
-// Password verification
-userSchema.methods.verifyPassword = async function(candidatePassword) {
-  return await bcrypt.compare(candidatePassword, this.password);
-};
 
 
 module.exports = mongoose.model('User', userSchema);

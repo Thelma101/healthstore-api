@@ -38,74 +38,87 @@ const createSendToken = (user, statusCode, req, res) => {
 
 exports.signup = async (req, res) => {
   try {
+    const { firstName, lastName, email, password, passwordConfirm, phone, address } = req.body;
 
-    //     if (!validator.isEmail(req.body.email)) {
-    //   return res.status(400).json({
-    //     success: false,
-    //     message: 'Validation failed',
-    //     errors: [{ field: 'email', message: 'Invalid email format' }]
-    //   });
-    // }
+    // 1) Validate password confirmation
+    if (password !== passwordConfirm) {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation failed',
+        errors: [{ 
+          field: 'passwordConfirm', 
+          message: 'Passwords do not match' 
+        }]
+      });
+    }
 
-    const existingUser = await User.findOne({ email: req.body.email });
+    // 2) Check for existing user
+    const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(409).json({
         success: false,
-        message: 'Email already exists',
-        errors: [{ field: 'email', message: 'Email already registered' }]
+        message: 'Registration failed',
+        errors: [{ 
+          field: 'email', 
+          message: 'Email already registered' 
+        }]
       });
     }
-    const { firstName, lastName, email, password, phone } = req.body;
 
-
-    const newUser = await User.create({
-      firstName,
-      lastName,
-      email,
-      password,
-      phone
+    // 3) Create and save user
+    const newUser = await User.create({ 
+      firstName, 
+      lastName, 
+      email, 
+      password, 
+      phone ,
+      address: typeof address === 'string' 
+        ? { street: address } // Handle string address
+        : address // Handle object address
     });
 
-    // 2) Generate verification token
+    // 4) Generate and save verification token
     const verificationToken = newUser.createEmailVerificationToken();
     await newUser.save({ validateBeforeSave: false });
 
-    // 3) Send verification email (implementation depends on your email service)
-    // await sendVerificationEmail(newUser.email, verificationToken);
-console.log(`Verification token: ${verificationToken}`);
+    // 5) Send verification email
+    await sendVerificationEmail(newUser.email, verificationToken);
 
-    console.log(`Verification token: ${verificationToken}`);
-
-  
-    // 4) Respond without sensitive data
-    const userResponse = {
-      id: newUser._id,
-      firstName: newUser.firstName,
-      email: newUser.email,
-      phone: newUser.phone
-    };
-
+    // 6) Format response
     return res.status(201).json({
       success: true,
-      message: 'User registered successfully. Verification email sent.',
-      data: userResponse
+      message: 'User registered successfully',
+      data: {
+        id: newUser._id,
+        firstName: newUser.firstName,
+        lastName: newUser.lastName,
+        email: newUser.email,
+        phone: newUser.phone,
+
+      }
     });
 
   } catch (err) {
-    // Handle duplicate email error specifically
-    if (err.message.includes('already registered')) {
-      return res.status(409).json({
-        success: false,
-        message: err.message,
-        errors: [{ field: 'email', message: err.message }]
-      });
-    }
+    // Handle validation errors
+    // if (err.name === 'ValidationError') {
+    //   const errors = Object.values(err.errors).map(e => ({
+    //     field: e.path,
+    //     message: e.message
+    //   }));
 
-    // Handle other errors
-    return res.status(400).json({
+    //   return res.status(400).json({
+    //     success: false,
+    //     message: 'Validation failed',
+    //     errors
+    //   });
+    // }
+
+    // Handle all other errors
+    return res.status(500).json({
       success: false,
       message: 'Registration failed',
-      errors: [{ message: err.message }]
+      errors: [{ message: err.message }],
+      stack: err.stack
     });
   }
 };
