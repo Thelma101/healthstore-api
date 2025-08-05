@@ -5,7 +5,7 @@ const sendVerificationEmail = async (email, token) => {
     const msg = {
         to: email,
         from: 'akpata.thelma@gmail.com', // Use a verified sender
-        subject: 'Verify Your Email',
+        subject: `${process.env.} Verify Your Email with Tee's Health Store`,
         text: `Your verification token: ${token}`,
         html: `<strong>Verify here: <a href="http://yourapp.com/verify?token=${token}">Click</a></strong>`,
     };
