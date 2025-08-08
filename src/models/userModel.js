@@ -87,6 +87,21 @@ const userSchema = new mongoose.Schema({
     toObject: { virtuals: true }
 });
 
+
+userSchema.methods.generateAuthToken = function() {
+  const token = jwt.sign(
+    { id: this._id, email: this.email, role: this.role },
+    process.env.JWT_SECRET,
+    { expiresIn: process.env.JWT_EXPIRES_IN || '30d' }
+  );
+  return token;
+};
+
+// Also add the verifyPassword method if not already present
+userSchema.methods.verifyPassword = async function(candidatePassword) {
+  return await bcrypt.compare(candidatePassword, this.password);
+};
+
 // Password handling middleware
 userSchema.pre('save', async function (next) {
     if (!this.isModified('password')) return next();

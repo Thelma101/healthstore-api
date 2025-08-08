@@ -127,12 +127,16 @@ exports.signup = async (req, res) => {
   }
 };
 
+
 exports.login = async (req, res) => {
   try {
+    console.log('Login attempt for email:', req.body.email);
+    
     const { email, password } = req.body;
 
     // 1) Validate input
     if (!email || !password) {
+      console.log('Validation failed - missing email or password');
       return res.status(400).json({
         success: false,
         message: 'Validation failed',
@@ -146,6 +150,7 @@ exports.login = async (req, res) => {
     // 2) Check if user exists
     const user = await User.findOne({ email }).select('+password');
     if (!user) {
+      console.log('User not found for email:', email);
       return res.status(401).json({
         success: false,
         message: 'Authentication failed',
@@ -159,6 +164,7 @@ exports.login = async (req, res) => {
     // 3) Verify password
     const isPasswordValid = await user.verifyPassword(password);
     if (!isPasswordValid) {
+      console.log('Invalid password for user:', user.email);
       return res.status(401).json({
         success: false,
         message: 'Authentication failed',
@@ -171,6 +177,7 @@ exports.login = async (req, res) => {
 
     // 4) Check if email is verified
     if (!user.isEmailVerified) {
+      console.log('Email not verified for user:', user.email);
       return res.status(403).json({
         success: false,
         message: 'Authentication failed',
@@ -182,6 +189,7 @@ exports.login = async (req, res) => {
     }
 
     // 5) Generate token
+    console.log('Generating token for user:', user.email);
     const token = user.generateAuthToken();
 
     // 6) Update last login
@@ -189,6 +197,7 @@ exports.login = async (req, res) => {
     await user.save({ validateBeforeSave: false });
 
     // 7) Format response
+    console.log('Successful login for user:', user.email);
     return res.status(200).json({
       success: true,
       message: 'Login successful',
@@ -204,13 +213,107 @@ exports.login = async (req, res) => {
     });
 
   } catch (err) {
+    console.error('Login error:', {
+      message: err.message,
+      stack: err.stack,
+      body: req.body
+    });
+    
     return res.status(500).json({
       success: false,
       message: 'Login failed',
-      errors: [{ message: err.message }]
+      errors: [{ 
+        message: err.message,
+        ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
+      }]
     });
   }
 };
+
+// exports.login = async (req, res) => {
+//   try {
+//     const { email, password } = req.body;
+
+//     // 1) Validate input
+//     if (!email || !password) {
+//       return res.status(400).json({
+//         success: false,
+//         message: 'Validation failed',
+//         errors: [
+//           { field: 'email', message: 'Email is required' },
+//           { field: 'password', message: 'Password is required' }
+//         ]
+//       });
+//     }
+
+//     // 2) Check if user exists
+//     const user = await User.findOne({ email }).select('+password');
+//     if (!user) {
+//       return res.status(401).json({
+//         success: false,
+//         message: 'Authentication failed',
+//         errors: [{ 
+//           field: 'email', 
+//           message: 'Invalid email or password' 
+//         }]
+//       });
+//     }
+
+//     // 3) Verify password
+//     const isPasswordValid = await user.verifyPassword(password);
+//     if (!isPasswordValid) {
+//       return res.status(401).json({
+//         success: false,
+//         message: 'Authentication failed',
+//         errors: [{ 
+//           field: 'password', 
+//           message: 'Invalid email or password' 
+//         }]
+//       });
+//     }
+
+//     // 4) Check if email is verified
+//     if (!user.isEmailVerified) {
+//       return res.status(403).json({
+//         success: false,
+//         message: 'Authentication failed',
+//         errors: [{ 
+//           field: 'email', 
+//           message: 'Please verify your email first' 
+//         }]
+//       });
+//     }
+
+//     // 5) Generate token
+//     const token = user.generateAuthToken();
+
+//     // 6) Update last login
+//     user.lastLogin = Date.now();
+//     await user.save({ validateBeforeSave: false });
+
+//     // 7) Format response
+//     return res.status(200).json({
+//       success: true,
+//       message: 'Login successful',
+//       data: {
+//         token,
+//         user: {
+//           id: user._id,
+//           firstName: user.firstName,
+//           email: user.email,
+//           role: user.role
+//         }
+//       }
+//     });
+
+//   } catch (err) {
+//     return res.status(500).json({
+//       success: false,
+//       message: 'Login failed',
+//       errors: [{ message: err.message }]
+//     });
+//   }
+// };
 
 exports.logout = (req, res) => {
   res.cookie('jwt', 'loggedout', {
