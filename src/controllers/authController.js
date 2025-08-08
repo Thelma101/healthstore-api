@@ -12,7 +12,7 @@ const {
   errorResponse,
   conflictResponse
 } = require('../utils/apiResponse');
-
+const token = require('../utils/generateToken');
 
 const createSendToken = (user, statusCode, req, res) => {
   const token = signToken(user._id);
@@ -185,7 +185,8 @@ exports.login = async (req, res) => {
 
     // 5) Generate token
     console.log('Generating token for user:', user.email);
-    const token = user.generateAuthToken();
+    // const token = user.generateAuthToken();
+    generateToken();
 
     // 6) Update last login
     user.lastLogin = Date.now();
