@@ -12,7 +12,7 @@ const {
   errorResponse,
   conflictResponse
 } = require('../utils/apiResponse');
-const token = require('../utils/generateToken');
+const { generateToken, setTokenCookie } = require('../utils/tokenUtils');
 
 const createSendToken = (user, statusCode, req, res) => {
   const token = signToken(user._id);
@@ -41,9 +41,9 @@ exports.signup = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: 'Validation failed',
-        errors: [{ 
-          field: 'passwordConfirm', 
-          message: 'Passwords do not match' 
+        errors: [{
+          field: 'passwordConfirm',
+          message: 'Passwords do not match'
         }]
       });
     }
@@ -54,21 +54,21 @@ exports.signup = async (req, res) => {
       return res.status(409).json({
         success: false,
         message: 'Registration failed',
-        errors: [{ 
-          field: 'email', 
-          message: 'Email already registered' 
+        errors: [{
+          field: 'email',
+          message: 'Email already registered'
         }]
       });
     }
 
     // 3) Create and save user
-    const newUser = await User.create({ 
-      firstName, 
-      lastName, 
-      email, 
-      password, 
-      phone ,
-      address: typeof address === 'string' 
+    const newUser = await User.create({
+      firstName,
+      lastName,
+      email,
+      password,
+      phone,
+      address: typeof address === 'string'
         ? { street: address } // Handle string address
         : address // Handle object address
     });
@@ -126,7 +126,7 @@ exports.signup = async (req, res) => {
 exports.login = async (req, res) => {
   try {
     console.log('Login attempt for email:', req.body.email);
-    
+
     const { email, password } = req.body;
 
     // 1) Validate input
@@ -149,9 +149,9 @@ exports.login = async (req, res) => {
       return res.status(401).json({
         success: false,
         message: 'Authentication failed',
-        errors: [{ 
-          field: 'email', 
-          message: 'Invalid email or password' 
+        errors: [{
+          field: 'email',
+          message: 'Invalid email or password'
         }]
       });
     }
@@ -163,9 +163,9 @@ exports.login = async (req, res) => {
       return res.status(401).json({
         success: false,
         message: 'Authentication failed',
-        errors: [{ 
-          field: 'password', 
-          message: 'Invalid email or password' 
+        errors: [{
+          field: 'password',
+          message: 'Invalid email or password'
         }]
       });
     }
@@ -176,17 +176,19 @@ exports.login = async (req, res) => {
       return res.status(403).json({
         success: false,
         message: 'Authentication failed',
-        errors: [{ 
-          field: 'email', 
-          message: 'Please verify your email first' 
+        errors: [{
+          field: 'email',
+          message: 'Please verify your email first'
         }]
       });
     }
 
     // 5) Generate token
-    console.log('Generating token for user:', user.email);
-    // const token = user.generateAuthToken();
-    generateToken();
+    const token = generateToken({
+      id: user._id,
+      email: user.email,
+      role: user.role
+    });
 
     // 6) Update last login
     user.lastLogin = Date.now();
@@ -201,8 +203,9 @@ exports.login = async (req, res) => {
         token,
         user: {
           id: user._id,
-          firstName: user.firstName,
+          fullName: `${user.firstName} ${user.lastName}`,
           email: user.email,
+          phone: user.phone,
           role: user.role
         }
       }
@@ -214,11 +217,11 @@ exports.login = async (req, res) => {
       stack: err.stack,
       body: req.body
     });
-    
+
     return res.status(500).json({
       success: false,
       message: 'Login failed',
-      errors: [{ 
+      errors: [{
         message: err.message,
         ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
       }]

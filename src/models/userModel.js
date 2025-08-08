@@ -89,14 +89,14 @@ const userSchema = new mongoose.Schema({
 });
 
 
-userSchema.methods.generateAuthToken = function() {
-  const token = jwt.sign(
-    { id: this._id, email: this.email, role: this.role },
-    process.env.JWT_SECRET,
-    { expiresIn: process.env.JWT_EXPIRES_IN || '1d' }
-  );
-  return token;
-};
+// userSchema.methods.generateAuthToken = function() {
+//   const token = jwt.sign(
+//     { id: this._id, email: this.email, role: this.role },
+//     process.env.JWT_SECRET,
+//     { expiresIn: process.env.JWT_EXPIRES_IN || '1d' }
+//   );
+//   return token;
+// };
 
 
 // Also add the verifyPassword method if not already present
