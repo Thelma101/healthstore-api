@@ -202,11 +202,11 @@ exports.login = async (req, res) => {
       data: {
         token,
         user: {
-          id: user._id,
           fullName: `${user.firstName} ${user.lastName}`,
           email: user.email,
           phone: user.phone,
-          role: user.role
+          role: user.role,
+          id: user._id,
         }
       }
     });
