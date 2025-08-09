@@ -2,7 +2,7 @@ const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const User = require('../models/userModel');
 // const { generateToken, setTokenCookie } = require('../utils/tokenUtils');
-const sendEmail = require('../utils/email');
+// const sendVerificationEmail = require('../utils/emailSender');
 const { sendVerificationEmail } = require('../utils/emailSender');
 const {
   successResponse,
@@ -14,7 +14,7 @@ const {
   errorResponse,
   conflictResponse
 } = require('../utils/apiResponse');
-const { generateToken, setTokenCookie } = require('../utils/tokenUtils');
+const { generateToken, setTokenCookie } = require('../utils/generateToken');
 
 const createSendToken = (user, statusCode, req, res) => {
   const token = signToken(user._id);
@@ -159,7 +159,7 @@ exports.signup = async (req, res) => {
 
     // 5) Send verification email
     const verificationUrl = `${process.env.CLIENT_URL}/verify-email/${verificationToken}`;
-    await sendEmail({
+    await sendVerificationEmail({
       email: newUser.email,
       subject: 'Verify your email',
       template: 'emailVerification',

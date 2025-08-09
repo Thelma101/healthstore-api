@@ -1,7 +1,7 @@
 const sgMail = require('@sendgrid/mail');
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
-const sendVerificationEmail = async (email, firstName, token) => {
+const sendEmail = async (email, firstName, token) => {
 const msg = {
     to: email,
     from: {
@@ -75,5 +75,5 @@ const msg = {
 
 
 module.exports = {
-    sendVerificationEmail
+    sendEmail
 };
