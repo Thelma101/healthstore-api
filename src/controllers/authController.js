@@ -1,6 +1,8 @@
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const User = require('../models/userModel');
+// const { generateToken, setTokenCookie } = require('../utils/tokenUtils');
+const sendEmail = require('../utils/email');
 const { sendVerificationEmail } = require('../utils/emailSender');
 const {
   successResponse,
@@ -32,33 +34,113 @@ const createSendToken = (user, statusCode, req, res) => {
 
 
 
+// exports.signup = async (req, res) => {
+//   try {
+//     const { firstName, lastName, email, password, passwordConfirm, phone, address } = req.body;
+
+//     // 1) Validate password confirmation
+//     if (password !== passwordConfirm) {
+//       return res.status(400).json({
+//         success: false,
+//         message: 'Validation failed',
+//         errors: [{
+//           field: 'passwordConfirm',
+//           message: 'Passwords do not match'
+//         }]
+//       });
+//     }
+
+//     // 2) Check for existing user
+//     const existingUser = await User.findOne({ email });
+//     if (existingUser) {
+//       return res.status(409).json({
+//         success: false,
+//         message: 'Registration failed',
+//         errors: [{
+//           field: 'email',
+//           message: 'Email already registered'
+//         }]
+//       });
+//     }
+
+//     // 3) Create and save user
+//     const newUser = await User.create({
+//       firstName,
+//       lastName,
+//       email,
+//       password,
+//       phone,
+//       address: typeof address === 'string'
+//         ? { street: address } // Handle string address
+//         : address // Handle object address
+//     });
+
+//     // 4) Generate and save verification token
+//     const verificationToken = newUser.createEmailVerificationToken();
+//     await newUser.save({ validateBeforeSave: false });
+
+//     // 5) Send verification email
+//     await sendVerificationEmail(newUser.email, newUser.firstName, verificationToken);
+//     console.log(`Verification token: ${verificationToken}`);
+//     console.log(`Verification URL: ${process.env.CLIENT_URL}/verify-email/${verificationToken}`);
+
+
+//     // 6) Format response
+//     return res.status(201).json({
+//       success: true,
+//       message: 'User registered successfully',
+//       data: {
+//         id: newUser._id,
+//         firstName: newUser.firstName,
+//         lastName: newUser.lastName,
+//         email: newUser.email,
+//         phone: newUser.phone,
+
+//       }
+//     });
+
+//   } catch (err) {
+//     // Handle validation errors
+//     // if (err.name === 'ValidationError') {
+//     //   const errors = Object.values(err.errors).map(e => ({
+//     //     field: e.path,
+//     //     message: e.message
+//     //   }));
+
+//     //   return res.status(400).json({
+//     //     success: false,
+//     //     message: 'Validation failed',
+//     //     errors
+//     //   });
+//     // }
+
+//     // Handle all other errors
+//     return res.status(500).json({
+//       success: false,
+//       message: 'Registration failed',
+//       errors: [{ message: err.message }],
+//       stack: err.stack
+//     });
+//   }
+// };
+
 exports.signup = async (req, res) => {
   try {
     const { firstName, lastName, email, password, passwordConfirm, phone, address } = req.body;
 
     // 1) Validate password confirmation
     if (password !== passwordConfirm) {
-      return res.status(400).json({
-        success: false,
-        message: 'Validation failed',
-        errors: [{
-          field: 'passwordConfirm',
-          message: 'Passwords do not match'
-        }]
-      });
+      return validationErrorResponse(res, [
+        { field: 'passwordConfirm', message: 'Passwords do not match' }
+      ]);
     }
 
     // 2) Check for existing user
     const existingUser = await User.findOne({ email });
     if (existingUser) {
-      return res.status(409).json({
-        success: false,
-        message: 'Registration failed',
-        errors: [{
-          field: 'email',
-          message: 'Email already registered'
-        }]
-      });
+      return conflictResponse(res, 'Email already registered', [
+        { field: 'email', message: 'Email already registered' }
+      ]);
     }
 
     // 3) Create and save user
@@ -68,9 +150,7 @@ exports.signup = async (req, res) => {
       email,
       password,
       phone,
-      address: typeof address === 'string'
-        ? { street: address } // Handle string address
-        : address // Handle object address
+      address: typeof address === 'string' ? { street: address } : address
     });
 
     // 4) Generate and save verification token
@@ -78,156 +158,155 @@ exports.signup = async (req, res) => {
     await newUser.save({ validateBeforeSave: false });
 
     // 5) Send verification email
-    await sendVerificationEmail(newUser.email, newUser.firstName, verificationToken);
-    console.log(`Verification token: ${verificationToken}`);
-    console.log(`Verification URL: ${process.env.CLIENT_URL}/verify-email/${verificationToken}`);
-
-
-    // 6) Format response
-    return res.status(201).json({
-      success: true,
-      message: 'User registered successfully',
-      data: {
-        id: newUser._id,
-        firstName: newUser.firstName,
-        lastName: newUser.lastName,
-        email: newUser.email,
-        phone: newUser.phone,
-
+    const verificationUrl = `${process.env.CLIENT_URL}/verify-email/${verificationToken}`;
+    await sendEmail({
+      email: newUser.email,
+      subject: 'Verify your email',
+      template: 'emailVerification',
+      context: {
+        name: newUser.firstName,
+        verificationUrl
       }
     });
+
+    // 6) Format response (remove sensitive data)
+    const userData = {
+      id: newUser._id,
+      firstName: newUser.firstName,
+      lastName: newUser.lastName,
+      email: newUser.email,
+      phone: newUser.phone
+    };
+
+    return createdResponse(res, userData, 'User registered successfully. Verification email sent.');
 
   } catch (err) {
     // Handle validation errors
-    // if (err.name === 'ValidationError') {
-    //   const errors = Object.values(err.errors).map(e => ({
-    //     field: e.path,
-    //     message: e.message
-    //   }));
+    if (err.name === 'ValidationError') {
+      const errors = Object.values(err.errors).map(e => ({
+        field: e.path,
+        message: e.message
+      }));
+      return validationErrorResponse(res, errors);
+    }
 
-    //   return res.status(400).json({
-    //     success: false,
-    //     message: 'Validation failed',
-    //     errors
-    //   });
-    // }
+    // Handle duplicate email error
+    if (err.code === 11000) {
+      return conflictResponse(res, 'Email already registered', [
+        { field: 'email', message: 'Email already registered' }
+      ]);
+    }
 
-    // Handle all other errors
-    return res.status(500).json({
-      success: false,
-      message: 'Registration failed',
-      errors: [{ message: err.message }],
-      stack: err.stack
-    });
+    return errorResponse(res, 'Registration failed: ' + err.message);
   }
 };
 
 
-exports.login = async (req, res) => {
-  try {
-    console.log('Login attempt for email:', req.body.email);
+// exports.login = async (req, res) => {
+//   try {
+//     console.log('Login attempt for email:', req.body.email);
 
-    const { email, password } = req.body;
+//     const { email, password } = req.body;
 
-    // 1) Validate input
-    if (!email || !password) {
-      console.log('Validation failed - missing email or password');
-      return res.status(400).json({
-        success: false,
-        message: 'Validation failed',
-        errors: [
-          { field: 'email', message: 'Email is required' },
-          { field: 'password', message: 'Password is required' }
-        ]
-      });
-    }
+//     // 1) Validate input
+//     if (!email || !password) {
+//       console.log('Validation failed - missing email or password');
+//       return res.status(400).json({
+//         success: false,
+//         message: 'Validation failed',
+//         errors: [
+//           { field: 'email', message: 'Email is required' },
+//           { field: 'password', message: 'Password is required' }
+//         ]
+//       });
+//     }
 
-    // 2) Check if user exists
-    const user = await User.findOne({ email }).select('+password');
-    if (!user) {
-      console.log('User not found for email:', email);
-      return res.status(401).json({
-        success: false,
-        message: 'Authentication failed',
-        errors: [{
-          field: 'email',
-          message: 'Invalid email or password'
-        }]
-      });
-    }
+//     // 2) Check if user exists
+//     const user = await User.findOne({ email }).select('+password');
+//     if (!user) {
+//       console.log('User not found for email:', email);
+//       return res.status(401).json({
+//         success: false,
+//         message: 'Authentication failed',
+//         errors: [{
+//           field: 'email',
+//           message: 'Invalid email or password'
+//         }]
+//       });
+//     }
 
-    // 3) Verify password
-    const isPasswordValid = await user.verifyPassword(password);
-    if (!isPasswordValid) {
-      console.log('Invalid password for user:', user.email);
-      return res.status(401).json({
-        success: false,
-        message: 'Authentication failed',
-        errors: [{
-          field: 'password',
-          message: 'Invalid email or password'
-        }]
-      });
-    }
+//     // 3) Verify password
+//     const isPasswordValid = await user.verifyPassword(password);
+//     if (!isPasswordValid) {
+//       console.log('Invalid password for user:', user.email);
+//       return res.status(401).json({
+//         success: false,
+//         message: 'Authentication failed',
+//         errors: [{
+//           field: 'password',
+//           message: 'Invalid email or password'
+//         }]
+//       });
+//     }
 
-    // 4) Check if email is verified
-    if (!user.isEmailVerified) {
-      console.log('Email not verified for user:', user.email);
-      return res.status(403).json({
-        success: false,
-        message: 'Authentication failed',
-        errors: [{
-          field: 'email',
-          message: 'Please verify your email first'
-        }]
-      });
-    }
+//     // 4) Check if email is verified
+//     if (!user.isEmailVerified) {
+//       console.log('Email not verified for user:', user.email);
+//       return res.status(403).json({
+//         success: false,
+//         message: 'Authentication failed',
+//         errors: [{
+//           field: 'email',
+//           message: 'Please verify your email first'
+//         }]
+//       });
+//     }
 
-    // 5) Generate token
-    const token = generateToken({
-      id: user._id,
-      email: user.email,
-      role: user.role
-    });
+//     // 5) Generate token
+//     const token = generateToken({
+//       id: user._id,
+//       email: user.email,
+//       role: user.role
+//     });
 
-    // 6) Update last login
-    user.lastLogin = Date.now();
-    await user.save({ validateBeforeSave: false });
+//     // 6) Update last login
+//     user.lastLogin = Date.now();
+//     await user.save({ validateBeforeSave: false });
 
-    // 7) Format response
-    console.log('Successful login for user:', user.email);
-    return res.status(200).json({
-      success: true,
-      message: 'Login successful',
-      data: {
-        token,
-        user: {
-          fullName: `${user.firstName} ${user.lastName}`,
-          email: user.email,
-          phone: user.phone,
-          role: user.role,
-          id: user._id,
-        }
-      }
-    });
+//     // 7) Format response
+//     console.log('Successful login for user:', user.email);
+//     return res.status(200).json({
+//       success: true,
+//       message: 'Login successful',
+//       data: {
+//         token,
+//         user: {
+//           fullName: `${user.firstName} ${user.lastName}`,
+//           email: user.email,
+//           phone: user.phone,
+//           role: user.role,
+//           id: user._id,
+//         }
+//       }
+//     });
 
-  } catch (err) {
-    console.error('Login error:', {
-      message: err.message,
-      stack: err.stack,
-      body: req.body
-    });
+//   } catch (err) {
+//     console.error('Login error:', {
+//       message: err.message,
+//       stack: err.stack,
+//       body: req.body
+//     });
 
-    return res.status(500).json({
-      success: false,
-      message: 'Login failed',
-      errors: [{
-        message: err.message,
-        ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
-      }]
-    });
-  }
-};
+//     return res.status(500).json({
+//       success: false,
+//       message: 'Login failed',
+//       errors: [{
+//         message: err.message,
+//         ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
+//       }]
+//     });
+//   }
+// };
 
 // exports.login = async (req, res) => {
 //   try {
@@ -313,6 +392,69 @@ exports.login = async (req, res) => {
 //     });
 //   }
 // };
+
+
+exports.login = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    // 1) Validate input
+    if (!email || !password) {
+      return validationErrorResponse(res, [
+        { field: 'email', message: 'Email is required' },
+        { field: 'password', message: 'Password is required' }
+      ]);
+    }
+
+    // 2) Check if user exists
+    const user = await User.findOne({ email }).select('+password');
+    if (!user) {
+      return unauthorizedResponse(res, 'Invalid email or password');
+    }
+
+    // 3) Verify password
+    const isPasswordValid = await user.verifyPassword(password);
+    if (!isPasswordValid) {
+      return unauthorizedResponse(res, 'Invalid email or password');
+    }
+
+    // 4) Check if email is verified
+    if (!user.isEmailVerified) {
+      return forbiddenResponse(res, 'Please verify your email first', [
+        { field: 'email', message: 'Please verify your email first' }
+      ]);
+    }
+
+    // 5) Generate token
+    const token = generateToken({
+      id: user._id,
+      email: user.email,
+      role: user.role
+    });
+
+    // 6) Set cookie
+    setTokenCookie(res, token);
+
+    // 7) Update last login
+    user.lastLogin = Date.now();
+    await user.save({ validateBeforeSave: false });
+
+    // 8) Format response
+    const userData = {
+      id: user._id,
+      fullName: `${user.firstName} ${user.lastName}`,
+      email: user.email,
+      phone: user.phone,
+      role: user.role
+    };
+
+    return successResponse(res, { user: userData, token }, 'Login successful');
+
+  } catch (err) {
+    return errorResponse(res, 'Login failed: ' + err.message);
+  }
+};
+
 
 exports.logout = (req, res) => {
   res.cookie('jwt', 'loggedout', {
