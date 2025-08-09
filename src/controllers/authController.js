@@ -3,7 +3,7 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/userModel');
 // const { generateToken, setTokenCookie } = require('../utils/tokenUtils');
 // const sendVerificationEmail = require('../utils/emailSender');
-const { sendVerificationEmail } = require('../utils/emailSender');
+const { sendEmail } = require('../utils/emailSender');
 const {
   successResponse,
   createdResponse,
@@ -159,12 +159,13 @@ exports.signup = async (req, res) => {
 
     // 5) Send verification email
     const verificationUrl = `${process.env.CLIENT_URL}/verify-email/${verificationToken}`;
-    await sendVerificationEmail({
+    await sendEmail({
       email: newUser.email,
       subject: 'Verify your email',
       template: 'emailVerification',
       context: {
         name: newUser.firstName,
+        verificationToken,
         verificationUrl
       }
     });
@@ -178,7 +179,8 @@ exports.signup = async (req, res) => {
       phone: newUser.phone
     };
 
-    return createdResponse(res, userData, 'User registered successfully. Verification email sent.');
+    return createdResponse(res, userData, 'Registration successful! Check your email to verify your account.'
+    );
 
   } catch (err) {
     // Handle validation errors
@@ -201,6 +203,70 @@ exports.signup = async (req, res) => {
   }
 };
 
+// In authController.js
+exports.verifyEmail = async (req, res) => {
+  try {
+    // 1) Hash the token from URL
+    const hashedToken = crypto
+      .createHash('sha256')
+      .update(req.params.token)
+      .digest('hex');
+
+    // 2) Find user with valid token
+    const user = await User.findOne({
+      emailVerificationToken: hashedToken,
+      emailVerificationExpire: { $gt: Date.now() }
+    });
+
+    if (!user) {
+      return badRequestResponse(res, 'Verification token is invalid or expired');
+    }
+
+    // 3) Mark as verified
+    user.isEmailVerified = true;
+    user.emailVerificationToken = undefined;
+    user.emailVerificationExpire = undefined;
+    await user.save();
+
+    // 4) Return JSON response (no redirect)
+    return successResponse(res, null, 'Email verified successfully');
+
+  } catch (err) {
+    return errorResponse(res, 'Verification failed: ' + err.message);
+  }
+};
+
+// exports.verifyEmail = async (req, res) => {
+//   try {
+//     // 1) Hash token from URL
+//     const hashedToken = crypto
+//       .createHash('sha256')
+//       .update(req.params.token)
+//       .digest('hex');
+
+//     // 2) Find user with valid token
+//     const user = await User.findOne({
+//       emailVerificationToken: hashedToken,
+//       emailVerificationExpire: { $gt: Date.now() }
+//     });
+
+//     if (!user) {
+//       return res.redirect(`${process.env.CLIENT_URL}/verification-failed`);
+//     }
+
+//     // 3) Mark as verified
+//     user.isEmailVerified = true;
+//     user.emailVerificationToken = undefined;
+//     user.emailVerificationExpire = undefined;
+//     await user.save();
+
+//     // 4) Redirect to success page
+//     return res.redirect(`${process.env.CLIENT_URL}/verification-success`);
+
+//   } catch (err) {
+//     return res.redirect(`${process.env.CLIENT_URL}/verification-error`);
+//   }
+// };
 
 // exports.login = async (req, res) => {
 //   try {
