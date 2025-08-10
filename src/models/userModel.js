@@ -92,17 +92,10 @@ const userSchema = new mongoose.Schema({
 // userSchema.methods.generateAuthToken = function() {
 //   const token = jwt.sign(
 //     { id: this._id, email: this.email, role: this.role },
-//     process.env.JWT_SECRET,
 //     { expiresIn: process.env.JWT_EXPIRES_IN || '1d' }
 //   );
 //   return token;
 // };
-
-
-// Also add the verifyPassword method if not already present
-userSchema.methods.verifyPassword = async function(candidatePassword) {
-  return await bcrypt.compare(candidatePassword, this.password);
-};
 
 // Password handling middleware
 userSchema.pre('save', async function (next) {
@@ -156,7 +149,7 @@ userSchema.methods = {
 
         this.emailVerificationExpire = Date.now() + 24 * 60 * 60 * 1000;
 
-        return verificationToken;
+        return verificationToken; // Return the raw token, not the hashed one
     }
 };
 
