@@ -127,7 +127,8 @@ const createSendToken = (user, statusCode, req, res) => {
 exports.signup = async (req, res) => {
   try {
     const { firstName, lastName, email, password, passwordConfirm, phone, address } = req.body;
-
+  console.log('Request Body:', req.body); // Debug log
+  console.log('Headers:', req.headers); // Check content-type
     // 1) Validate password confirmation
     if (password !== passwordConfirm) {
       return validationErrorResponse(res, [
@@ -159,17 +160,20 @@ exports.signup = async (req, res) => {
 
 
     // 5) Send verification email
-    const verificationUrl = `${process.env.CLIENT_URL}/verify-email/${verificationToken}`;
-    await sendEmail({
-      email: newUser.email,
-      subject: 'Verify your email',
-      template: 'emailVerification',
-      context: {
-        name: newUser.firstName,
-        verificationToken,
-        verificationUrl
-      }
-    });
+    // const verificationUrl = `${process.env.CLIENT_URL}/verify-email/${verificationToken}`;
+    // await sendEmail({
+    //   email: newUser.email,
+    //   subject: 'Verify your email',
+    //   template: 'emailVerification',
+    //   context: {
+    //     name: newUser.firstName,
+    //     verificationToken,
+    //     verificationUrl
+    //   }
+    // });
+       console.log('Sending verification email to:', newUser.email);
+    await sendEmail(newUser.email, newUser.firstName, verificationToken);
+
 
     // 6) Format response (remove sensitive data)
     const userData = {

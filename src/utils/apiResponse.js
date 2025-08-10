@@ -23,7 +23,7 @@ const errorResponse = (res, message = 'Internal Server Error', statusCode = 500,
     success: false,
     message,
     errors,
-    stack: error.stack,
+    stack: errors.stack,
     timestamp: new Date().toISOString()
   });
 };
