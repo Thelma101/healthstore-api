@@ -76,7 +76,7 @@ const userSchema = new mongoose.Schema({
     },
     profileImage: { type: String, default: 'default.jpg' },
     isEmailVerified: { type: Boolean, default: false },
-    isActive: { type: Boolean, default: true, select: false },
+    isActive: { type: Boolean, default: false, select: true },
     passwordChangedAt: Date, // Added for password change tracking
     resetPasswordToken: String,
     resetPasswordExpire: Date,
@@ -85,7 +85,7 @@ const userSchema = new mongoose.Schema({
 }, {
     timestamps: true,
     toJSON: { virtuals: true },
-    toObject: { virtuals: true }
+    toObject: { virtuals: true },
 });
 
 
