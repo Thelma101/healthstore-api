@@ -156,7 +156,7 @@ userSchema.methods = {
 
         this.emailVerificationExpire = Date.now() + 24 * 60 * 60 * 1000;
 
-        return verificationToken;
+        return verificationToken; // Return the raw token, not the hashed one
     }
 };
 

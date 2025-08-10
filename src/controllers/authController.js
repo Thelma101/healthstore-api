@@ -155,21 +155,13 @@ exports.signup = async (req, res) => {
 
     // 4) Generate and save verification token
     const verificationToken = newUser.createEmailVerificationToken();
+    console.log('Generated verification token:', verificationToken);
+    console.log('User firstName:', newUser.firstName);
     await newUser.save({ validateBeforeSave: false });
 
-
     // 5) Send verification email
-    const verificationUrl = `${process.env.CLIENT_URL}/verify-email/${verificationToken}`;
-    await sendEmail({
-      email: newUser.email,
-      subject: 'Verify your email',
-      template: 'emailVerification',
-      context: {
-        name: newUser.firstName,
-        verificationToken,
-        verificationUrl
-      }
-    });
+    console.log('Sending verification email to:', newUser.email);
+    await sendEmail(newUser.email, newUser.firstName, verificationToken);
 
     // 6) Format response (remove sensitive data)
     const userData = {
