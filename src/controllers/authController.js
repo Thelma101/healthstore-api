@@ -157,6 +157,7 @@ exports.signup = async (req, res) => {
     const verificationToken = newUser.createEmailVerificationToken();
     await newUser.save({ validateBeforeSave: false });
 
+
     // 5) Send verification email
     const verificationUrl = `${process.env.CLIENT_URL}/verify-email/${verificationToken}`;
     await sendEmail({
