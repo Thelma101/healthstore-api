@@ -1,7 +1,8 @@
-// utils/tokenUtils.js
+const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 
-const generateToken = (payload) => {
+// JWT Tokens (Authentication)
+const generateAuthToken = (payload) => {
   return jwt.sign(
     payload,
     process.env.JWT_SECRET,
@@ -9,7 +10,7 @@ const generateToken = (payload) => {
   );
 };
 
-const setTokenCookie = (res, token) => {
+const setAuthCookie = (res, token) => {
   res.cookie('jwt', token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
@@ -18,4 +19,30 @@ const setTokenCookie = (res, token) => {
   });
 };
 
-module.exports = { generateToken, setTokenCookie };
+// Verification Tokens (Email, Password Reset)
+const generateVerificationToken = () => {
+  const token = crypto.randomBytes(32).toString('hex');
+  const hashedToken = crypto
+    .createHash('sha256')
+    .update(token)
+    .digest('hex');
+  return { token, hashedToken };
+};
+
+const verifyToken = (inputToken, storedHash) => {
+  const inputHash = crypto
+    .createHash('sha256')
+    .update(inputToken)
+    .digest('hex');
+  return inputHash === storedHash;
+};
+
+module.exports = {
+  // Authentication
+  generateAuthToken,
+  setAuthCookie,
+  
+  // Verification
+  generateVerificationToken,
+  verifyToken
+};

@@ -1,7 +1,11 @@
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const User = require('../models/userModel');
-// const { generateToken, setTokenCookie } = require('../utils/tokenUtils');
+const {
+  generateAuthToken,
+  setAuthCookie,
+  generateVerificationToken
+} = require('../utils/tokenUtils');
 // const sendVerificationEmail = require('../utils/emailSender');
 const { sendEmail } = require('../utils/emailSender');
 const {
@@ -16,23 +20,6 @@ const {
   forbiddenResponse
 } = require('../utils/apiResponse');
 const { generateToken, setTokenCookie } = require('../utils/generateToken');
-
-const createSendToken = (user, statusCode, req, res) => {
-  const token = signToken(user._id);
-
-  res.cookie('jwt', token, {
-    expires: new Date(
-      Date.now() + process.env.JWT_COOKIE_EXPIRES_IN * 24 * 60 * 60 * 1000
-    ),
-    httpOnly: true,
-    secure: req.secure || req.headers['x-forwarded-proto'] === 'https'
-  });
-
-  user.password = undefined;
-
-  return successResponse(res, { user }, 'Authentication successful', statusCode);
-};
-
 
 
 // exports.signup = async (req, res) => {
@@ -567,7 +554,7 @@ exports.logout = (req, res) => {
 exports.forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
-    
+
     // 1) Find user
     const user = await User.findOne({ email });
     if (!user) {
@@ -576,8 +563,13 @@ exports.forgotPassword = async (req, res) => {
     }
 
     // 2) Generate reset token (expires in 10 mins)
-    const resetToken = user.createPasswordResetToken();
-    await user.save({ validateBeforeSave: false });
+    // const resetToken = user.createPasswordResetToken();
+    // await user.save({ validateBeforeSave: false });
+
+    const { token: resetToken, hashedToken } = generateVerificationToken();
+    user.passwordResetToken = hashedToken;
+    user.passwordResetExpires = Date.now() + 10 * 60 * 1000; // 10 minutes
+    await user.save();
 
     // 3) Send email
     try {
@@ -597,7 +589,8 @@ exports.forgotPassword = async (req, res) => {
 
     return successResponse(res, null, "Password reset token sent to email");
   } catch (err) {
-    return errorResponse(res, "Failed to process password reset request");
+    return errorResponse(res, 'Failed to send password reset email: ' + err.message + err.stack);
+  //     errorResponse(res, "Failed to process password reset request");
   }
 };
 
