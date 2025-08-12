@@ -11,7 +11,7 @@ router.get('/verify-email/:token', authController.verifyEmail);
 
 
 // Protected routes
-router.post('/logout', authController.logout);
+router.post('/logout/:id', authController.logout);
 router.patch('/update-password', authController.updatePassword);
 
 module.exports = router;

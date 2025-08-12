@@ -12,7 +12,8 @@ const {
   notFoundResponse,
   validationErrorResponse,
   errorResponse,
-  conflictResponse
+  conflictResponse,
+  forbiddenResponse
 } = require('../utils/apiResponse');
 const { generateToken, setTokenCookie } = require('../utils/generateToken');
 
@@ -220,15 +221,15 @@ exports.verifyEmail = async (req, res) => {
     const tokenFromUrl = req.params.token;
     console.log('=== VERIFICATION DEBUG ===');
     console.log('Plain token from URL:', tokenFromUrl);
-    
+
     // Hash the token from URL to match what's in DB
     const hashedToken = crypto
       .createHash('sha256')
       .update(tokenFromUrl)
       .digest('hex');
-    
+
     console.log('Hashed token for comparison:', hashedToken);
-    
+
     // Find user with hashed token
     const user = await User.findOne({
       emailVerificationToken: hashedToken,
@@ -549,25 +550,49 @@ exports.login = async (req, res) => {
 
 
 exports.logout = (req, res) => {
-  res.cookie('jwt', 'loggedout', {
-    expires: new Date(Date.now() + 10 * 1000),
-    httpOnly: true
-  });
-  return successResponse(res, null, 'Logged out successfully');
+  try {
+    res.clearCookie('jwt', 'loggedout', {
+      httpOnly: true,
+      expires: new Date(Date.now() + 10 * 1000),
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+    });
+    return successResponse(res, null, 'Logged out successfully');
+  } catch (err) {
+    return errorResponse(res, 'Logout failed: ' + err.message);
+  }
 };
+
 
 exports.forgotPassword = async (req, res) => {
   try {
-    const user = await User.findOne({ email: req.body.email });
+        const { email } = req.body;
+    
+    if (!email) {
+      return validationErrorResponse(res, [
+        { field: 'email', message: 'Email is required' }
+      ]);
+    }
+
+    const user = await User.findOne({ email });
     if (!user) {
       return notFoundResponse(res, 'User not found with that email');
     }
 
     const resetToken = user.createPasswordResetToken();
-    await user.save({ validateBeforeSave: false });
+    await newUser.save({ validateBeforeSave: false });
 
     // TODO: Send password reset email
     console.log(`Reset token: ${resetToken}`);
+
+    await sendEmail(
+      user.email,
+      user.firstName,
+      resetToken
+    );
+
+    const resetUrl = `${process.env.CLIENT_URL}/reset-password/${resetToken}`;
+    console.log(`Password reset URL: ${resetUrl}`);
 
     return successResponse(res, null, 'Password reset token sent to email');
   } catch (err) {
