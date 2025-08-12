@@ -566,80 +566,112 @@ exports.logout = (req, res) => {
 
 exports.forgotPassword = async (req, res) => {
   try {
-        const { email } = req.body;
+    const { email } = req.body;
     
-    if (!email) {
-      return validationErrorResponse(res, [
-        { field: 'email', message: 'Email is required' }
-      ]);
-    }
-
+    // 1) Find user
     const user = await User.findOne({ email });
     if (!user) {
-      return notFoundResponse(res, 'User not found with that email');
+      // Don't reveal if user doesn't exist (security best practice)
+      return successResponse(res, null, "If the email exists, a reset link will be sent");
     }
 
+    // 2) Generate reset token (expires in 10 mins)
     const resetToken = user.createPasswordResetToken();
-    await newUser.save({ validateBeforeSave: false });
+    await user.save({ validateBeforeSave: false });
 
-    // TODO: Send password reset email
-    console.log(`Reset token: ${resetToken}`);
+    // 3) Send email
+    try {
+      await sendEmail({
+        type: 'passwordReset',
+        email: user.email,
+        firstName: user.firstName,
+        resetToken
+      });
+    } catch (emailErr) {
+      // Clear token if email fails
+      user.passwordResetToken = undefined;
+      user.passwordResetExpires = undefined;
+      await user.save({ validateBeforeSave: false });
+      throw emailErr;
+    }
 
-    await sendEmail(
-      user.email,
-      user.firstName,
-      resetToken
-    );
-
-    const resetUrl = `${process.env.CLIENT_URL}/reset-password/${resetToken}`;
-    console.log(`Password reset URL: ${resetUrl}`);
-
-    return successResponse(res, null, 'Password reset token sent to email');
+    return successResponse(res, null, "Password reset token sent to email");
   } catch (err) {
-    return errorResponse(res, err.message);
+    return errorResponse(res, "Failed to process password reset request");
   }
 };
 
 exports.resetPassword = async (req, res) => {
   try {
+    const { token } = req.params;
+    const { password } = req.body;
+
+    // 1) Hash token and find user
     const hashedToken = crypto
       .createHash('sha256')
-      .update(req.params.token)
+      .update(token)
       .digest('hex');
 
     const user = await User.findOne({
       passwordResetToken: hashedToken,
-      passwordResetExpire: { $gt: Date.now() }
+      passwordResetExpires: { $gt: Date.now() }
     });
 
     if (!user) {
-      return badRequestResponse(res, 'Token is invalid or has expired');
+      return badRequestResponse(res, "Token invalid or expired");
     }
 
-    user.password = req.body.password;
+    // 2) Update password and clear reset token
+    user.password = password;
     user.passwordResetToken = undefined;
-    user.passwordResetExpire = undefined;
+    user.passwordResetExpires = undefined;
     await user.save();
 
-    return createSendToken(user, 200, req, res);
+    // 3) Send confirmation email (optional)
+    await sendEmail({
+      type: 'passwordChanged',
+      email: user.email,
+      firstName: user.firstName
+    });
+
+    // 4) Return new token or login response
+    const authToken = generateToken({
+      id: user._id,
+      email: user.email,
+      role: user.role
+    });
+
+    setTokenCookie(res, authToken);
+
+    return successResponse(res, { token: authToken }, "Password updated successfully");
   } catch (err) {
-    return errorResponse(res, err.message);
+    return errorResponse(res, "Password reset failed");
   }
 };
 
 exports.updatePassword = async (req, res) => {
   try {
+    const { currentPassword, newPassword } = req.body;
     const user = await User.findById(req.user.id).select('+password');
 
-    if (!(await user.correctPassword(req.body.currentPassword, user.password))) {
-      return unauthorizedResponse(res, 'Your current password is wrong');
+    // 1) Verify current password
+    if (!(await user.verifyPassword(currentPassword))) {
+      return unauthorizedResponse(res, "Current password is incorrect");
     }
 
-    user.password = req.body.newPassword;
+    // 2) Update password
+    user.password = newPassword;
     await user.save();
 
-    return createSendToken(user, 200, req, res);
+    // 3) Return new token
+    const authToken = generateToken({
+      id: user._id,
+      email: user.email,
+      role: user.role
+    });
+
+    return successResponse(res, { token: authToken }, "Password updated successfully");
   } catch (err) {
-    return errorResponse(res, err.message);
+    return errorResponse(res, "Password update failed");
   }
 };
