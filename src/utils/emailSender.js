@@ -1,4 +1,6 @@
+
 const sgMail = require('@sendgrid/mail');
+const crypto = require('crypto');
 require('dotenv').config();
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
@@ -110,5 +112,6 @@ The Tee's Health Store Team
         throw new Error('Failed to send verification email');
     }
 };
+
 
 module.exports = { sendEmail };
