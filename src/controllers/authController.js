@@ -6,7 +6,7 @@ const {
   setAuthCookie,
   generateVerificationToken
 } = require('../utils/tokenUtils');
-// const sendVerificationEmail = require('../utils/emailSender');
+const { sendPasswordResetEmail, passwordResetExpires } = require('../utils/emailSender');
 const { sendEmail } = require('../utils/emailSender');
 const {
   successResponse,
@@ -555,92 +555,106 @@ exports.forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
 
-    // 1) Find user
+    // 1) Validate email input
+    if (!email) {
+      return validationErrorResponse(res, [
+        { field: 'email', message: 'Email is required' }
+      ]);
+    }
+
+    // 2) Find user (security: don't reveal if user doesn't exist)
     const user = await User.findOne({ email });
     if (!user) {
-      // Don't reveal if user doesn't exist (security best practice)
       return successResponse(res, null, "If the email exists, a reset link will be sent");
     }
 
-    // 2) Generate reset token (expires in 10 mins)
-    // const resetToken = user.createPasswordResetToken();
-    // await user.save({ validateBeforeSave: false });
-
-    const { token: resetToken, hashedToken } = generateVerificationToken();
+    // 3) Generate and save reset token
+    const { token, hashedToken } = generateVerificationToken();
     user.passwordResetToken = hashedToken;
-    user.passwordResetExpires = Date.now() + 10 * 60 * 1000; // 10 minutes
+    user.passwordResetExpires = Date.now() + 600000;
     await user.save();
 
-    // 3) Send email
+    // await sendPasswordChangedEmail(user.email, user.firstName);
+
+    // 4) Send password reset email
     try {
-      await sendEmail({
-        type: 'passwordReset',
-        email: user.email,
-        firstName: user.firstName,
-        resetToken
-      });
+      await sendPasswordResetEmail(
+        user.email,
+        user.firstName || 'User',
+        token
+      );
     } catch (emailErr) {
-      // Clear token if email fails
+      // Clean up if email fails
       user.passwordResetToken = undefined;
       user.passwordResetExpires = undefined;
       await user.save({ validateBeforeSave: false });
-      throw emailErr;
+
+      console.error('Password reset email failed:', emailErr);
+      throw new Error('Failed to send password reset email');
     }
 
     return successResponse(res, null, "Password reset token sent to email");
   } catch (err) {
-    return errorResponse(res, 'Failed to send password reset email: ' + err.message + err.stack);
-  //     errorResponse(res, "Failed to process password reset request");
+    console.error('Password reset error:', err);
+    return errorResponse(res, "Failed to process password reset request" + err.message + err.stack);
   }
 };
 
+
 exports.resetPassword = async (req, res) => {
   try {
-    const { token } = req.params;
-    const { password } = req.body;
-
-    // 1) Hash token and find user
-    const hashedToken = crypto
-      .createHash('sha256')
-      .update(token)
-      .digest('hex');
-
+    const { token, newPassword } = req.body; // Token + new password
+    
     const user = await User.findOne({
-      passwordResetToken: hashedToken,
+      passwordResetToken: crypto.createHash('sha256').update(token).digest('hex'),
       passwordResetExpires: { $gt: Date.now() }
     });
 
     if (!user) {
-      return badRequestResponse(res, "Token invalid or expired");
+      return badRequestResponse(res, "Invalid or expired token" +  err.message + err.stack);
     }
 
-    // 2) Update password and clear reset token
-    user.password = password;
+    user.password = newPassword;
     user.passwordResetToken = undefined;
     user.passwordResetExpires = undefined;
     await user.save();
 
-    // 3) Send confirmation email (optional)
-    await sendEmail({
-      type: 'passwordChanged',
-      email: user.email,
-      firstName: user.firstName
-    });
-
-    // 4) Return new token or login response
-    const authToken = generateToken({
-      id: user._id,
-      email: user.email,
-      role: user.role
-    });
-
-    setTokenCookie(res, authToken);
-
-    return successResponse(res, { token: authToken }, "Password updated successfully");
+    return successResponse(res, null, "Password updated successfully");
   } catch (err) {
-    return errorResponse(res, "Password reset failed");
+    return errorResponse(res, "Password reset failed" + err.message + err.stack);
   }
 };
+
+// exports.resetPassword = async (req, res) => {
+//   try {
+//     const { token } = req.params;
+//     const { password } = req.body;
+
+//     // 1. Find user by hashed token
+//     const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+//     const user = await User.findOne({
+//       passwordResetToken: hashedToken,
+//       passwordResetExpires: { $gt: Date.now() }
+//     });
+
+//     if (!user) {
+//       return badRequestResponse(res, "Invalid or expired token");
+//     }
+
+//     // 2. Update password
+//     user.password = password;
+//     user.passwordResetToken = undefined;
+//     user.passwordResetExpires = undefined;
+//     await user.save();
+
+//     // 3. Send confirmation email (optional)
+//     await sendPasswordChangedEmail(user.email, user.firstName);
+
+//     return successResponse(res, null, "Password updated successfully");
+//   } catch (err) {
+//     return errorResponse(res, "Password reset failed");
+//   }
+// };
 
 exports.updatePassword = async (req, res) => {
   try {
