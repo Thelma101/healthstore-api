@@ -27,8 +27,8 @@ const sendVerificationEmail = async (email, firstName, token) => {
   await sgMail.send(msg);
 };
 
-const sendPasswordResetEmail = async (email, firstName, token) => {
-  const resetUrl = `${process.env.CLIENT_URL}/reset-password/${token}`;
+const sendPasswordResetEmail = async (email, firstName, resetToken) => {
+  const resetUrl = `${process.env.CLIENT_URL}/reset-password/${resetToken}`;
   
   const msg = {
     to: email,
@@ -37,27 +37,90 @@ const sendPasswordResetEmail = async (email, firstName, token) => {
       name: "Tee's Health Store"
     },
     subject: `Password Reset Request - Tee's Health Store`,
-    text: `Hi ${firstName || 'User'},\n\nReset your password: ${resetUrl}`,
+    text: `
+Hi ${firstName},
+
+You requested a password reset for your Tee's Health Store account.
+
+Reset Link: ${resetUrl}
+
+This link will expire in 10 minutes.
+
+If you didn't request this, please ignore this email.
+
+Warm regards,
+The Tee's Health Store Team
+    `,
     html: `
-      <!DOCTYPE html>
-      <html>
-      <body>
-        <h1>Password Reset</h1>
-        <p>Hi ${firstName || 'User'},</p>
-        <p>Reset your password: <a href="${resetUrl}">here</a></p>
-        <p><small>Link expires in 10 minutes</small></p>
-      </body>
-      </html>
-    `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Password Reset - Tee's Health Store</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f7fafc;">
+    <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; padding: 20px;">
+        <div style="text-align: center; margin-bottom: 30px;">
+            <h1 style="color: #2d3748; margin: 0; font-size: 24px;">Tee's Health Store</h1>
+        </div>
+        
+        <div style="background-color: #f7fafc; padding: 30px; border-radius: 8px; margin-bottom: 20px;">
+            <h2 style="color: #2d3748; margin-top: 0;">Password Reset Request</h2>
+            
+            <p style="color: #4a5568; line-height: 1.6; margin-bottom: 25px;">
+                Hi ${firstName}, you requested a password reset for your account. 
+                Click the button below to reset your password:
+            </p>
+            
+            <div style="text-align: center; margin: 30px 0;">
+                <a href="${resetUrl}" 
+                   style="display: inline-block; padding: 14px 28px; background-color: #e53e3e; 
+                          color: white; text-decoration: none; border-radius: 6px; font-weight: bold;
+                          font-size: 16px; box-shadow: 0 2px 4px rgba(229, 62, 62, 0.3);">
+                    Reset Password
+                </a>
+            </div>
+            
+            <p style="color: #718096; font-size: 14px; margin-bottom: 0;">
+                This link will expire in 10 minutes. If the button doesn't work, copy and paste this link:
+            </p>
+            <p style="color: #e53e3e; font-size: 14px; word-break: break-all; margin-top: 10px;">
+                ${resetUrl}
+            </p>
+        </div>
+        
+        <div style="text-align: center; color: #718096; font-size: 14px;">
+            <p style="margin-bottom: 10px;">
+                If you didn't request this password reset, you can safely ignore this email.
+            </p>
+            <p style="margin-bottom: 0;">
+                Warm regards,<br>
+                <strong>The Tee's Health Store Team</strong>
+            </p>
+        </div>
+    </div>
+</body>
+</html>
+    `,
+    headers: {
+      'X-Priority': '1',
+      'X-MSMail-Priority': 'High',
+      'Importance': 'high'
+    }
   };
 
-  await sgMail.send(msg);
+  try {
+    const result = await sgMail.send(msg);
+    console.log('Password reset email sent successfully');
+    return true;
+  } catch (error) {
+    console.error('Password reset email error:', error);
+    throw new Error('Failed to send password reset email');
+  }
 };
 
-module.exports = { 
-  sendVerificationEmail,
-  sendPasswordResetEmail 
-};
+module.exports = { sendEmail, sendPasswordResetEmail };
 
 
 

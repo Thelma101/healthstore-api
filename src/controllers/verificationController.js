@@ -1,13 +1,10 @@
+const crypto = require('crypto');
 const User = require('../models/userModel');
 const { 
   successResponse,
   badRequestResponse,
   errorResponse 
 } = require('../utils/apiResponse');
-const { 
-  generateVerificationToken,
-  verifyToken
-} = require('../utils/tokenUtils');
 
 module.exports = {
   /**
@@ -17,12 +14,18 @@ module.exports = {
     try {
       const { token } = req.params;
       
+      // Hash the token from URL to match what's stored
+      const hashedToken = crypto
+        .createHash('sha256')
+        .update(token)
+        .digest('hex');
+      
       const user = await User.findOne({
-        emailVerificationToken: { $exists: true },
+        emailVerificationToken: hashedToken,
         emailVerificationExpire: { $gt: Date.now() }
       });
 
-      if (!user || !verifyToken(token, user.emailVerificationToken)) {
+      if (!user) {
         return badRequestResponse(res, 'Invalid or expired verification token');
       }
 
@@ -33,6 +36,7 @@ module.exports = {
 
       return successResponse(res, null, 'Email verified successfully');
     } catch (err) {
+      console.error('Email verification error:', err);
       return errorResponse(res, 'Verification failed: ' + err.message);
     }
   },
@@ -45,12 +49,22 @@ module.exports = {
       const { token } = req.params;
       const { password } = req.body;
 
+      if (!password) {
+        return badRequestResponse(res, 'New password is required');
+      }
+
+      // Hash the token from URL to match what's stored
+      const hashedToken = crypto
+        .createHash('sha256')
+        .update(token)
+        .digest('hex');
+
       const user = await User.findOne({
-        passwordResetToken: { $exists: true },
+        passwordResetToken: hashedToken,
         passwordResetExpires: { $gt: Date.now() }
       });
 
-      if (!user || !verifyToken(token, user.passwordResetToken)) {
+      if (!user) {
         return badRequestResponse(res, 'Invalid or expired reset token');
       }
 
@@ -61,6 +75,7 @@ module.exports = {
 
       return successResponse(res, null, 'Password reset successfully');
     } catch (err) {
+      console.error('Password reset verification error:', err);
       return errorResponse(res, 'Password reset failed: ' + err.message);
     }
   }

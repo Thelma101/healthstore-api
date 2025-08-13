@@ -569,19 +569,22 @@ exports.forgotPassword = async (req, res) => {
     }
 
     // 3) Generate and save reset token
-    const { token, hashedToken } = generateVerificationToken();
-    user.passwordResetToken = hashedToken;
-    user.passwordResetExpires = Date.now() + 600000;
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const hashedResetToken = crypto
+      .createHash('sha256')
+      .update(resetToken)
+      .digest('hex');
+    
+    user.passwordResetToken = hashedResetToken;
+    user.passwordResetExpires = Date.now() + 600000; // 10 minutes
     await user.save();
-
-    // await sendPasswordChangedEmail(user.email, user.firstName);
 
     // 4) Send password reset email
     try {
       await sendPasswordResetEmail(
         user.email,
         user.firstName || 'User',
-        token
+        resetToken
       );
     } catch (emailErr) {
       // Clean up if email fails
@@ -596,24 +599,38 @@ exports.forgotPassword = async (req, res) => {
     return successResponse(res, null, "Password reset token sent to email");
   } catch (err) {
     console.error('Password reset error:', err);
-    return errorResponse(res, "Failed to process password reset request" + err.message + err.stack);
+    return errorResponse(res, "Failed to process password reset request");
   }
 };
 
 
 exports.resetPassword = async (req, res) => {
   try {
-    const { token, newPassword } = req.body; // Token + new password
+    const { token } = req.params;
+    const { newPassword } = req.body;
+    
+    if (!newPassword) {
+      return validationErrorResponse(res, [
+        { field: 'newPassword', message: 'New password is required' }
+      ]);
+    }
+
+    // Hash the token from URL to match what's stored
+    const hashedToken = crypto
+      .createHash('sha256')
+      .update(token)
+      .digest('hex');
     
     const user = await User.findOne({
-      passwordResetToken: crypto.createHash('sha256').update(token).digest('hex'),
+      passwordResetToken: hashedToken,
       passwordResetExpires: { $gt: Date.now() }
     });
 
     if (!user) {
-      return badRequestResponse(res, "Invalid or expired token" +  err.message + err.stack);
+      return badRequestResponse(res, "Invalid or expired token");
     }
 
+    // Update password
     user.password = newPassword;
     user.passwordResetToken = undefined;
     user.passwordResetExpires = undefined;
@@ -621,7 +638,8 @@ exports.resetPassword = async (req, res) => {
 
     return successResponse(res, null, "Password updated successfully");
   } catch (err) {
-    return errorResponse(res, "Password reset failed" + err.message + err.stack);
+    console.error('Password reset error:', err);
+    return errorResponse(res, "Password reset failed");
   }
 };
 
@@ -659,6 +677,14 @@ exports.resetPassword = async (req, res) => {
 exports.updatePassword = async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
+    
+    if (!currentPassword || !newPassword) {
+      return validationErrorResponse(res, [
+        { field: 'currentPassword', message: 'Current password is required' },
+        { field: 'newPassword', message: 'New password is required' }
+      ]);
+    }
+
     const user = await User.findById(req.user.id).select('+password');
 
     // 1) Verify current password
@@ -679,6 +705,7 @@ exports.updatePassword = async (req, res) => {
 
     return successResponse(res, { token: authToken }, "Password updated successfully");
   } catch (err) {
+    console.error('Password update error:', err);
     return errorResponse(res, "Password update failed");
   }
 };
