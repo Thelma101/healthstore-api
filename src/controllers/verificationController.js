@@ -70,7 +70,7 @@ exports.verifyResetToken = async (req, res) => {
     return successResponse(res, { 
       email: user.email,
       isValid: true 
-    }, "Token is valid");
+    }, "Password has been reset successfully. ");
   } catch (err) {
     console.error('Token verification error:', err);
     return errorResponse(res, "Token verification failed");

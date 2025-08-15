@@ -1,11 +1,6 @@
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const User = require('../models/userModel');
-const {
-  generateAuthToken,
-  setAuthCookie,
-  generateVerificationToken
-} = require('../utils/tokenUtils');
 const { sendVerificationEmail, sendPasswordResetEmail } = require('../utils/emailSender');
 // const { sendEmail } = require('../utils/emailSender');
 const {
@@ -590,14 +585,16 @@ exports.forgotPassword = async (req, res) => {
 exports.resetPassword = async (req, res) => {
   try {
     const { token } = req.params;
-    const { password } = req.body;
+    
+    // Debug logs
+    console.log('Reset Password Request:', {
+      method: req.method,
+      params: req.params,
+      body: req.body,
+      headers: req.headers
+    });
 
-    if (!password) {
-      return validationErrorResponse(res, [
-        { field: 'password', message: 'Password is required' }
-      ]);
-    }
-
+    // 1. Verify the token first (like email verification)
     const hashedToken = crypto
       .createHash('sha256')
       .update(token)
@@ -606,10 +603,25 @@ exports.resetPassword = async (req, res) => {
     const user = await User.findOne({
       resetPasswordToken: hashedToken,
       resetPasswordExpire: { $gt: Date.now() }
-    }).select('+password');
+    }).select('+password +resetPasswordToken +resetPasswordExpire');
 
     if (!user) {
       return badRequestResponse(res, "Invalid or expired token");
+    }
+
+
+    if (req.method === 'GET') {
+    return successResponse(res, { 
+      email: user.email,
+      isValid: true 
+    }, "Password updated successfully. ");
+    }
+
+    const { password } = req.body;
+    if (!password) {
+      return validationErrorResponse(res, [
+        { field: 'password', message: 'Password is required' }
+      ]);
     }
 
     user.password = password;
@@ -625,87 +637,6 @@ exports.resetPassword = async (req, res) => {
   }
 };
 
-
-// In resetPassword method:
-// exports.resetPassword = async (req, res) => {
-//   try {
-//     console.log('Reset Password Request Body:', req.body); // Debug log
-
-//     const { token } = req.params;
-//     const { password } = req.body;
-
-//     if (!password) {
-//       return validationErrorResponse(res, [
-//         { field: 'password', message: 'New password is required' }
-//       ]);
-//     }
-
-//     const hashedToken = crypto
-//       .createHash('sha256')
-//       .update(token)
-//       .digest('hex');
-
-//     const user = await User.findOne({
-//       resetPasswordToken: hashedToken,
-//       resetPasswordExpire: { $gt: Date.now() }
-//     }).select('+password');
-
-//     console.log('Token Verification Debug:', {
-//       inputToken: token,
-//       hashedToken,
-//       storedToken: user?.resetPasswordToken,
-//       expiresAt: user?.resetPasswordExpires ? new Date(user.resetPasswordExpire) : null,
-//       currentTime: new Date()
-//     });
-
-//     if (!user) {
-//       return badRequestResponse(res, "Invalid or expired token");
-//     }
-
-//     user.password = password;
-//     user.resetPasswordToken = undefined;
-//     user.resetPasswordExpires = undefined;
-//     user.passwordChangedAt = Date.now();
-//     await user.save();
-
-//     return successResponse(res, null, "Password updated successfully");
-//   } catch (err) {
-//     console.error('Reset password error:', err);
-//     return errorResponse(res, "Password reset failed");
-//   }
-// };
-
-
-// exports.resetPassword = async (req, res) => {
-//   try {
-//     const { token } = req.params;
-//     const { password } = req.body;
-
-//     // 1. Find user by hashed token
-//     const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
-//     const user = await User.findOne({
-//       passwordResetToken: hashedToken,
-//       passwordResetExpires: { $gt: Date.now() }
-//     });
-
-//     if (!user) {
-//       return badRequestResponse(res, "Invalid or expired token");
-//     }
-
-//     // 2. Update password
-//     user.password = password;
-//     user.passwordResetToken = undefined;
-//     user.passwordResetExpires = undefined;
-//     await user.save();
-
-//     // 3. Send confirmation email (optional)
-//     await sendPasswordChangedEmail(user.email, user.firstName);
-
-//     return successResponse(res, null, "Password updated successfully");
-//   } catch (err) {
-//     return errorResponse(res, "Password reset failed");
-//   }
-// };
 
 exports.updatePassword = async (req, res) => {
   try {
