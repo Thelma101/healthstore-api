@@ -6,8 +6,8 @@ const {
   setAuthCookie,
   generateVerificationToken
 } = require('../utils/tokenUtils');
-const { sendPasswordResetEmail, passwordResetExpires } = require('../utils/emailSender');
-const { sendEmail } = require('../utils/emailSender');
+const { sendVerificationEmail, sendPasswordResetEmail } = require('../utils/emailSender');
+// const { sendEmail } = require('../utils/emailSender');
 const {
   successResponse,
   createdResponse,
@@ -154,7 +154,7 @@ exports.signup = async (req, res) => {
     console.log('Current time:', new Date());
 
     console.log('Sending verification email to:', newUser.email);
-    await sendEmail(newUser.email, newUser.firstName, verificationToken);
+    await sendVerificationEmail(newUser.email, newUser.firstName, verificationToken);
 
     // 5) Generate JWT token for login
     const jwtToken = generateToken({ id: newUser._id });
@@ -206,47 +206,77 @@ exports.signup = async (req, res) => {
 exports.verifyEmail = async (req, res) => {
   try {
     const tokenFromUrl = req.params.token;
-    console.log('=== VERIFICATION DEBUG ===');
-    console.log('Plain token from URL:', tokenFromUrl);
+    
+    // Debug logs
+    console.log('=== EMAIL VERIFICATION DEBUG ===');
+    console.log('Received plain token:', tokenFromUrl);
+    console.log('Current server time:', new Date());
 
-    // Hash the token from URL to match what's in DB
+    // 1. Hash the incoming token
     const hashedToken = crypto
       .createHash('sha256')
       .update(tokenFromUrl)
       .digest('hex');
+    console.log('Computed hash:', hashedToken);
 
-    console.log('Hashed token for comparison:', hashedToken);
-
-    // Find user with hashed token
+    // 2. Find user with valid token
     const user = await User.findOne({
       emailVerificationToken: hashedToken,
-      emailVerificationExpire: { $gt: Date.now() }
-    });
+      emailVerificationExpire: { $gt: Date.now() - 30000 } // 30s buffer for clock skew
+    }).select('+emailVerificationToken +emailVerificationExpire');
 
-    console.log('User found:', user ? 'Yes' : 'No');
+    // Debug logs
     if (user) {
-      console.log('User email:', user.email);
-      console.log('Stored hashed token in DB:', user.emailVerificationToken);
-      console.log('Token expires at:', user.emailVerificationExpire);
-      console.log('Current time:', new Date());
+      console.log('Token details:', {
+        storedHash: user.emailVerificationToken,
+        expiresAt: new Date(user.emailVerificationExpire),
+        matches: user.emailVerificationToken === hashedToken,
+        valid: user.emailVerificationExpire > Date.now()
+      });
+    } else {
+      console.log('No user found with valid token');
     }
 
+    // 3. Validate token
     if (!user) {
-      return badRequestResponse(res, 'Verification token is invalid or expired');
+      return badRequestResponse(res, {
+        success: false,
+        message: "Invalid or expired verification token",
+        debug: process.env.NODE_ENV === 'development' ? {
+          receivedToken: tokenFromUrl,
+          computedHash: hashedToken,
+          currentTime: new Date()
+        } : undefined
+      });
     }
 
-    // Mark as verified
+    // 4. Mark as verified
     user.isEmailVerified = true;
     user.emailVerificationToken = undefined;
     user.emailVerificationExpire = undefined;
-    await user.save();
+    await user.save({ validateBeforeSave: false });
 
-    console.log('User verified successfully:', user.email);
-    return successResponse(res, null, 'Email verified successfully');
+    // 5. Return response
+    return successResponse(res, {
+      success: true,
+      email: user.email,
+      verifiedAt: new Date()
+    }, 'Email verified successfully');
 
   } catch (err) {
-    console.error('Verification error:', err);
-    return errorResponse(res, 'Verification failed: ' + err.message);
+    console.error('EMAIL VERIFICATION ERROR:', {
+      error: err.message,
+      stack: err.stack,
+      token: req.params.token,
+      timestamp: new Date()
+    });
+    
+    return errorResponse(res, {
+      success: false,
+      message: "Email verification failed",
+      systemError: process.env.NODE_ENV === 'development' ? err.message : undefined,
+      timestamp: new Date()
+    });
   }
 };
 
@@ -551,11 +581,12 @@ exports.logout = (req, res) => {
 };
 
 
+
+
 exports.forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
 
-    // 1) Validate email input
     if (!email) {
       return validationErrorResponse(res, [
         { field: 'email', message: 'Email is required' }
@@ -564,84 +595,78 @@ exports.forgotPassword = async (req, res) => {
 
     // 2) Find user (security: don't reveal if user doesn't exist)
     const user = await User.findOne({ email });
-    if (!user) {
-      return successResponse(res, null, "If the email exists, a reset link will be sent");
-    }
 
-    // 3) Generate and save reset token
-    const resetToken = crypto.randomBytes(32).toString('hex');
-    const hashedResetToken = crypto
-      .createHash('sha256')
-      .update(resetToken)
-      .digest('hex');
-    
-    user.passwordResetToken = hashedResetToken;
-    user.passwordResetExpires = Date.now() + 600000; // 10 minutes
-    await user.save();
+    if (user) {
+      const resetToken = user.createPasswordResetToken();
+      await user.save({ validateBeforeSave: false });
 
-    // 4) Send password reset email
-    try {
+      console.log('Password Reset Token:', {
+        plainToken: resetToken,
+        hashedToken: user.resetPasswordToken,
+        expiresAt: new Date(user.resetPasswordExpires)
+      });
+
       await sendPasswordResetEmail(
         user.email,
         user.firstName || 'User',
         resetToken
       );
-    } catch (emailErr) {
-      // Clean up if email fails
-      user.passwordResetToken = undefined;
-      user.passwordResetExpires = undefined;
-      await user.save({ validateBeforeSave: false });
-
-      console.error('Password reset email failed:', emailErr);
-      throw new Error('Failed to send password reset email');
     }
 
-    return successResponse(res, null, "Password reset token sent to email");
+    return successResponse(res, null, "If email exists, reset link sent");
   } catch (err) {
-    console.error('Password reset error:', err);
-    return errorResponse(res, "Failed to process password reset request");
+    console.error('Forgot password error:', err);
+    return errorResponse(res, "Password reset request failed");
   }
 };
 
-
+// In resetPassword method:
 exports.resetPassword = async (req, res) => {
   try {
     const { token } = req.params;
     const { newPassword } = req.body;
-    
+
     if (!newPassword) {
       return validationErrorResponse(res, [
         { field: 'newPassword', message: 'New password is required' }
       ]);
     }
-
-    // Hash the token from URL to match what's stored
     const hashedToken = crypto
       .createHash('sha256')
       .update(token)
       .digest('hex');
-    
+
     const user = await User.findOne({
-      passwordResetToken: hashedToken,
-      passwordResetExpires: { $gt: Date.now() }
+      resetPasswordToken: hashedToken,
+      resetPasswordExpires: { $gt: Date.now() }
+    });
+
+    console.log('Token verification:', {
+      inputToken: token,
+      hashedToken,
+      storedToken: user?.resetPasswordToken,
+      isValid: !!user,
+      expiresAt: user?.resetPasswordExpires
+        ? new Date(user.resetPasswordExpires)
+        : null
     });
 
     if (!user) {
       return badRequestResponse(res, "Invalid or expired token");
     }
 
-    // Update password
-    user.password = newPassword;
-    user.passwordResetToken = undefined;
-    user.passwordResetExpires = undefined;
+    user.password = password;
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpires = undefined;
     await user.save();
 
     return successResponse(res, null, "Password updated successfully");
   } catch (err) {
-    console.error('Password reset error:', err);
+    console.error('Reset password error:', err);
     return errorResponse(res, "Password reset failed");
   }
 };
+
 
 // exports.resetPassword = async (req, res) => {
 //   try {

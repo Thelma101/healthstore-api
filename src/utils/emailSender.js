@@ -203,7 +203,7 @@ The Tee's Health Store Team
 
   try {
     await sgMail.send(msg);
-    console.log(`Password reset email sent to ${email}`);
+    console.log(`Password reset email sent to ${email} ${token}`);
     return true;
   } catch (error) {
     console.error('Failed to send password reset email:', {

@@ -39,7 +39,8 @@ const userSchema = new mongoose.Schema({
         minlength: [8, 'Password must be at least 8 characters'],
         select: false,
         validate: {
-            validator: (v) => /^(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{8,}$/.test(v),
+            // validator: (v) => /^(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{8,}$/.test(v),
+            validator: (v) =>/^(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[!@#$%^&*]).{8,}$/.test(v),
             message: 'Password must contain at least one uppercase, one lowercase, and one number'
         }
     },
@@ -130,7 +131,7 @@ userSchema.pre('save', async function (next) {
 
     this.password = await bcrypt.hash(this.password, 12);
     this.passwordConfirm = undefined;
-    this.passwordChangedAt = Date.now() - 1000; // 1 second in past to ensure token created after
+    this.passwordChangedAt = Date.now() - 1000; 
     next();
 });
 
@@ -161,7 +162,7 @@ userSchema.methods = {
             .update(resetToken)
             .digest('hex');
 
-        this.resetPasswordExpire = Date.now() + 10 * 60 * 1000;
+        this.resetPasswordExpire = Date.now() + 10 * 60 * 172800000;
 
         return resetToken;
     },
@@ -174,7 +175,7 @@ userSchema.methods = {
             .update(verificationToken)
             .digest('hex');
 
-        this.emailVerificationExpire = Date.now() + 24 * 60 * 60 * 1000;
+        this.emailVerificationExpire = Date.now() + 24 * 60 * 60 * 172800000;
 
         return verificationToken;
     }

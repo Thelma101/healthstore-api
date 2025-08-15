@@ -6,77 +6,41 @@ const {
   errorResponse 
 } = require('../utils/apiResponse');
 
-module.exports = {
-  /**
-   * Email verification for registration
-   */
-  verifyEmail: async (req, res) => {
-    try {
-      const { token } = req.params;
-      
-      // Hash the token from URL to match what's stored
-      const hashedToken = crypto
-        .createHash('sha256')
-        .update(token)
-        .digest('hex');
-      
-      const user = await User.findOne({
-        emailVerificationToken: hashedToken,
-        emailVerificationExpire: { $gt: Date.now() }
-      });
+exports.verifyEmail = async (req, res) => {
+  try {
+    const { token } = req.params;
+    const hashedToken = crypto
+      .createHash('sha256')
+      .update(token)
+      .digest('hex');
 
-      if (!user) {
-        return badRequestResponse(res, 'Invalid or expired verification token');
-      }
+    const user = await User.findOne({
+      emailVerificationToken: hashedToken,
+      emailVerificationExpire: { $gt: Date.now() }
+    });
 
-      user.isEmailVerified = true;
-      user.emailVerificationToken = undefined;
-      user.emailVerificationExpire = undefined;
-      await user.save();
+    console.log('Email verification:', {
+      inputToken: token,
+      hashedToken,
+      storedToken: user?.emailVerificationToken,
+      isValid: !!user,
+      expiresAt: user?.emailVerificationExpire
+        ? new Date(user.emailVerificationExpire)
+        : null
+    });
 
-      return successResponse(res, null, 'Email verified successfully');
-    } catch (err) {
-      console.error('Email verification error:', err);
-      return errorResponse(res, 'Verification failed: ' + err.message);
+    if (!user) {
+      return badRequestResponse(res, 'Invalid or expired verification token');
     }
-  },
 
-  /**
-   * Password reset verification
-   */
-  verifyPasswordReset: async (req, res) => {
-    try {
-      const { token } = req.params;
-      const { password } = req.body;
+    user.isEmailVerified = true;
+    user.emailVerificationToken = undefined;
+    user.emailVerificationExpire = undefined;
+    await user.save();
 
-      if (!password) {
-        return badRequestResponse(res, 'New password is required');
-      }
-
-      // Hash the token from URL to match what's stored
-      const hashedToken = crypto
-        .createHash('sha256')
-        .update(token)
-        .digest('hex');
-
-      const user = await User.findOne({
-        passwordResetToken: hashedToken,
-        passwordResetExpires: { $gt: Date.now() }
-      });
-
-      if (!user) {
-        return badRequestResponse(res, 'Invalid or expired reset token');
-      }
-
-      user.password = password;
-      user.passwordResetToken = undefined;
-      user.passwordResetExpires = undefined;
-      await user.save();
-
-      return successResponse(res, null, 'Password reset successfully');
-    } catch (err) {
-      console.error('Password reset verification error:', err);
-      return errorResponse(res, 'Password reset failed: ' + err.message);
-    }
+    return successResponse(res, null, 'Email verified successfully');
+  } catch (err) {
+    console.error('Email verification error:', err);
+    return errorResponse(res, 'Verification failed');
   }
 };
