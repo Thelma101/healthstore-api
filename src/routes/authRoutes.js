@@ -13,16 +13,10 @@ router.post('/login', authController.login);
 // router.post('/forgot-password', authController.forgotPassword);
 router.get('/reset-password/:token', authController.resetPassword); 
 
-// router.post('/forgot-password', authController.forgotPassword);
-// router.post('/reset-password/:token', authController.resetPassword);
-router.get('/verify-email/:token', verificationController.verifyEmail);
-
-// API Endpoints
 router.post('/forgot-password', authController.forgotPassword);
+router.get('/verify-email/:token', verificationController.verifyEmail);
 router.post('/reset-password/:token', authController.resetPassword);
-
-// Frontend Routes
-router.get('/reset-password', viewController.getResetPasswordPage);
+router.get('/reset-password/:token', verificationController.verifyResetToken); 
 
 module.exports = router;
 

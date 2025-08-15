@@ -47,3 +47,32 @@ exports.verifyEmail = async (req, res) => {
     return errorResponse(res, "Email verification failed");
   }
 };
+
+
+exports.verifyResetToken = async (req, res) => {
+  try {
+    const { token } = req.params;
+
+    const hashedToken = crypto
+      .createHash('sha256')
+      .update(token)
+      .digest('hex');
+
+    const user = await User.findOne({
+      resetPasswordToken: hashedToken,
+      resetPasswordExpire: { $gt: Date.now() }
+    });
+
+    if (!user) {
+      return badRequestResponse(res, "Invalid or expired token");
+    }
+
+    return successResponse(res, { 
+      email: user.email,
+      isValid: true 
+    }, "Token is valid");
+  } catch (err) {
+    console.error('Token verification error:', err);
+    return errorResponse(res, "Token verification failed");
+  }
+};

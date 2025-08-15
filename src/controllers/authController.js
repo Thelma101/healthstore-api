@@ -173,7 +173,7 @@ exports.signup = async (req, res) => {
         isActive: newUser.isActive
       },
       auth: {
-        token: jwtToken,  // JWT token for login
+        token: jwtToken,
         expiresIn: process.env.JWT_EXPIRES_IN,
         verificationToken: verificationToken
       }
@@ -387,152 +387,152 @@ exports.login = async (req, res) => {
   }
 };
 
-exports.login = async (req, res) => {
-  try {
-    const { email, password } = req.body;
+// exports.login = async (req, res) => {
+//   try {
+//     const { email, password } = req.body;
 
-    // 1) Validate input
-    if (!email || !password) {
-      return res.status(400).json({
-        success: false,
-        message: 'Validation failed',
-        errors: [
-          { field: 'email', message: 'Email is required' },
-          { field: 'password', message: 'Password is required' }
-        ]
-      });
-    }
+//     // 1) Validate input
+//     if (!email || !password) {
+//       return res.status(400).json({
+//         success: false,
+//         message: 'Validation failed',
+//         errors: [
+//           { field: 'email', message: 'Email is required' },
+//           { field: 'password', message: 'Password is required' }
+//         ]
+//       });
+//     }
 
-    // 2) Check if user exists
-    const user = await User.findOne({ email }).select('+password');
-    if (!user) {
-      return res.status(401).json({
-        success: false,
-        message: 'Authentication failed',
-        errors: [{ 
-          field: 'email', 
-          message: 'Invalid email or password' 
-        }]
-      });
-    }
+//     // 2) Check if user exists
+//     const user = await User.findOne({ email }).select('+password');
+//     if (!user) {
+//       return res.status(401).json({
+//         success: false,
+//         message: 'Authentication failed',
+//         errors: [{ 
+//           field: 'email', 
+//           message: 'Invalid email or password' 
+//         }]
+//       });
+//     }
 
-    // 3) Verify password
-    const isPasswordValid = await user.verifyPassword(password);
-    if (!isPasswordValid) {
-      return res.status(401).json({
-        success: false,
-        message: 'Authentication failed',
-        errors: [{ 
-          field: 'password', 
-          message: 'Invalid email or password' 
-        }]
-      });
-    }
+//     // 3) Verify password
+//     const isPasswordValid = await user.verifyPassword(password);
+//     if (!isPasswordValid) {
+//       return res.status(401).json({
+//         success: false,
+//         message: 'Authentication failed',
+//         errors: [{ 
+//           field: 'password', 
+//           message: 'Invalid email or password' 
+//         }]
+//       });
+//     }
 
-    // 4) Check if email is verified
-    if (!user.isEmailVerified) {
-      return res.status(403).json({
-        success: false,
-        message: 'Authentication failed',
-        errors: [{ 
-          field: 'email', 
-          message: 'Please verify your email first' 
-        }]
-      });
-    }
+//     // 4) Check if email is verified
+//     if (!user.isEmailVerified) {
+//       return res.status(403).json({
+//         success: false,
+//         message: 'Authentication failed',
+//         errors: [{ 
+//           field: 'email', 
+//           message: 'Please verify your email first' 
+//         }]
+//       });
+//     }
 
-    // 5) Generate token
-    const token = user.generateAuthToken();
+//     // 5) Generate token
+//     const token = user.generateAuthToken();
 
-    // 6) Update last login
-    user.lastLogin = Date.now();
-    await user.save({ validateBeforeSave: false });
+//     // 6) Update last login
+//     user.lastLogin = Date.now();
+//     await user.save({ validateBeforeSave: false });
 
-    // 7) Format response
-    return res.status(200).json({
-      success: true,
-      message: 'Login successful',
-      data: {
-        token,
-        user: {
-          id: user._id,
-          firstName: user.firstName,
-          email: user.email,
-          role: user.role
-        }
-      }
-    });
+//     // 7) Format response
+//     return res.status(200).json({
+//       success: true,
+//       message: 'Login successful',
+//       data: {
+//         token,
+//         user: {
+//           id: user._id,
+//           firstName: user.firstName,
+//           email: user.email,
+//           role: user.role
+//         }
+//       }
+//     });
 
-  } catch (err) {
-    return res.status(500).json({
-      success: false,
-      message: 'Login failed',
-      errors: [{ message: err.message }]
-    });
-  }
-};
+//   } catch (err) {
+//     return res.status(500).json({
+//       success: false,
+//       message: 'Login failed',
+//       errors: [{ message: err.message }]
+//     });
+//   }
+// };
 
 
-exports.login = async (req, res) => {
-  try {
-    const { email, password } = req.body;
+// exports.login = async (req, res) => {
+//   try {
+//     const { email, password } = req.body;
 
-    // 1) Validate input
-    if (!email || !password) {
-      return validationErrorResponse(res, [
-        { field: 'email', message: 'Email is required' },
-        { field: 'password', message: 'Password is required' }
-      ]);
-    }
+//     // 1) Validate input
+//     if (!email || !password) {
+//       return validationErrorResponse(res, [
+//         { field: 'email', message: 'Email is required' },
+//         { field: 'password', message: 'Password is required' }
+//       ]);
+//     }
 
-    // 2) Check if user exists
-    const user = await User.findOne({ email }).select('+password');
-    if (!user) {
-      return unauthorizedResponse(res, 'Invalid email or password');
-    }
+//     // 2) Check if user exists
+//     const user = await User.findOne({ email }).select('+password');
+//     if (!user) {
+//       return unauthorizedResponse(res, 'Invalid email or password');
+//     }
 
-    // 3) Verify password
-    const isPasswordValid = await user.verifyPassword(password);
-    if (!isPasswordValid) {
-      return unauthorizedResponse(res, 'Invalid email or password');
-    }
+//     // 3) Verify password
+//     const isPasswordValid = await user.verifyPassword(password);
+//     if (!isPasswordValid) {
+//       return unauthorizedResponse(res, 'Invalid email or password');
+//     }
 
-    // 4) Check if email is verified
-    if (!user.isEmailVerified) {
-      return forbiddenResponse(res, 'Please verify your email first', [
-        { field: 'email', message: 'Please verify your email first' }
-      ]);
-    }
+//     // 4) Check if email is verified
+//     if (!user.isEmailVerified) {
+//       return forbiddenResponse(res, 'Please verify your email first', [
+//         { field: 'email', message: 'Please verify your email first' }
+//       ]);
+//     }
 
-    // 5) Generate token
-    const token = generateToken({
-      id: user._id,
-      email: user.email,
-      role: user.role
-    });
+//     // 5) Generate token
+//     const token = generateToken({
+//       id: user._id,
+//       email: user.email,
+//       role: user.role
+//     });
 
-    // 6) Set cookie
-    setTokenCookie(res, token);
+//     // 6) Set cookie
+//     setTokenCookie(res, token);
 
-    // 7) Update last login
-    user.lastLogin = Date.now();
-    await user.save({ validateBeforeSave: false });
+//     // 7) Update last login
+//     user.lastLogin = Date.now();
+//     await user.save({ validateBeforeSave: false });
 
-    // 8) Format response
-    const userData = {
-      id: user._id,
-      fullName: `${user.firstName} ${user.lastName}`,
-      email: user.email,
-      phone: user.phone,
-      role: user.role
-    };
+//     // 8) Format response
+//     const userData = {
+//       id: user._id,
+//       fullName: `${user.firstName} ${user.lastName}`,
+//       email: user.email,
+//       phone: user.phone,
+//       role: user.role
+//     };
 
-    return successResponse(res, { user: userData, token }, 'Login successful');
+//     return successResponse(res, { user: userData, token }, 'Login successful');
 
-  } catch (err) {
-    return errorResponse(res, 'Login failed: ' + err.message + err.stack);
-  }
-};
+//   } catch (err) {
+//     return errorResponse(res, 'Login failed: ' + err.message + err.stack);
+//   }
+// };
 
 
 exports.logout = (req, res) => {
@@ -548,9 +548,6 @@ exports.logout = (req, res) => {
     return errorResponse(res, 'Logout failed: ' + err.message);
   }
 };
-
-
-
 
 exports.forgotPassword = async (req, res) => {
   try {
@@ -589,17 +586,15 @@ exports.forgotPassword = async (req, res) => {
   }
 };
 
-// In resetPassword method:
+
 exports.resetPassword = async (req, res) => {
   try {
-    console.log('Reset Password Request Body:', req.body); // Debug log
-
     const { token } = req.params;
     const { password } = req.body;
 
     if (!password) {
       return validationErrorResponse(res, [
-        { field: 'password', message: 'New password is required' }
+        { field: 'password', message: 'Password is required' }
       ]);
     }
 
@@ -613,21 +608,13 @@ exports.resetPassword = async (req, res) => {
       resetPasswordExpire: { $gt: Date.now() }
     }).select('+password');
 
-    console.log('Token Verification Debug:', {
-      inputToken: token,
-      hashedToken,
-      storedToken: user?.resetPasswordToken,
-      expiresAt: user?.resetPasswordExpires ? new Date(user.resetPasswordExpire) : null,
-      currentTime: new Date()
-    });
-
     if (!user) {
       return badRequestResponse(res, "Invalid or expired token");
     }
 
     user.password = password;
     user.resetPasswordToken = undefined;
-    user.resetPasswordExpires = undefined;
+    user.resetPasswordExpire = undefined;
     user.passwordChangedAt = Date.now();
     await user.save();
 
@@ -637,6 +624,56 @@ exports.resetPassword = async (req, res) => {
     return errorResponse(res, "Password reset failed");
   }
 };
+
+
+// In resetPassword method:
+// exports.resetPassword = async (req, res) => {
+//   try {
+//     console.log('Reset Password Request Body:', req.body); // Debug log
+
+//     const { token } = req.params;
+//     const { password } = req.body;
+
+//     if (!password) {
+//       return validationErrorResponse(res, [
+//         { field: 'password', message: 'New password is required' }
+//       ]);
+//     }
+
+//     const hashedToken = crypto
+//       .createHash('sha256')
+//       .update(token)
+//       .digest('hex');
+
+//     const user = await User.findOne({
+//       resetPasswordToken: hashedToken,
+//       resetPasswordExpire: { $gt: Date.now() }
+//     }).select('+password');
+
+//     console.log('Token Verification Debug:', {
+//       inputToken: token,
+//       hashedToken,
+//       storedToken: user?.resetPasswordToken,
+//       expiresAt: user?.resetPasswordExpires ? new Date(user.resetPasswordExpire) : null,
+//       currentTime: new Date()
+//     });
+
+//     if (!user) {
+//       return badRequestResponse(res, "Invalid or expired token");
+//     }
+
+//     user.password = password;
+//     user.resetPasswordToken = undefined;
+//     user.resetPasswordExpires = undefined;
+//     user.passwordChangedAt = Date.now();
+//     await user.save();
+
+//     return successResponse(res, null, "Password updated successfully");
+//   } catch (err) {
+//     console.error('Reset password error:', err);
+//     return errorResponse(res, "Password reset failed");
+//   }
+// };
 
 
 // exports.resetPassword = async (req, res) => {

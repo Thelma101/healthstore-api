@@ -112,27 +112,11 @@ The Tee's Health Store Team
   }
 };
 
-// const sendPasswordResetEmail = async (email, firstName, token) => {
-//     const resetUrl = `${process.env.CLIENT_URL}/reset-password?token=${token}`;
-    
-//     const msg = {
-//         to: email,
-//         from: process.env.EMAIL_FROM,
-//         subject: 'Reset Your Password',
-//         html: `
-//             <p>Hello ${firstName},</p>
-//             <p>Please click the link below to reset your password:</p>
-//             <p><a href="${resetUrl}">Reset Password</a></p>
-//         `
-//     };
-    
-//     await sgMail.send(msg);
-// };
+
 
 const sendPasswordResetEmail = async (email, firstName, token) => {
-//   const resetUrl = `${process.env.CLIENT_URL}/reset-password/${token}`;
-
-const resetUrl = `${process.env.CLIENT_URL}/reset-password?token=${token}`;
+  const resetUrl = `${process.env.CLIENT_URL}/reset-password/${token}`;
+// const resetUrl = `${process.env.CLIENT_URL}/reset-password?token=${token}`;
 
   const msg = {
     to: email,
