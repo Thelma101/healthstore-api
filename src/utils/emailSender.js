@@ -130,7 +130,7 @@ Please click the link below to set a new password:
 
 Reset Link: ${resetUrl}
 
-This link will expire in 10 minutes.
+This link will expire in 48 hours.
 
 If you didn't request this, please ignore this email.
 
@@ -177,7 +177,7 @@ The Tee's Health Store Team
             </div>
             
             <p style="color: #718096; font-size: 14px; margin-bottom: 0;">
-                This link will expire in 10 minutes. If you didn't request this, please ignore this email.
+                This link will expire in 48 hours. If you didn't request this, please ignore this email.
             </p>
             <p style="color: #4299e1; font-size: 14px; word-break: break-all; margin-top: 10px;">
                 ${resetUrl}

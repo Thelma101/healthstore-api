@@ -30,6 +30,7 @@ module.exports = {
       }
 
       user.isEmailVerified = true;
+      user.isActive = true; // Activate user after email verification
       user.emailVerificationToken = undefined;
       user.emailVerificationExpire = undefined;
       await user.save();
@@ -60,8 +61,8 @@ module.exports = {
         .digest('hex');
 
       const user = await User.findOne({
-        passwordResetToken: hashedToken,
-        passwordResetExpires: { $gt: Date.now() }
+        resetPasswordToken: hashedToken,
+        resetPasswordExpire: { $gt: Date.now() }
       });
 
       if (!user) {
@@ -69,8 +70,8 @@ module.exports = {
       }
 
       user.password = password;
-      user.passwordResetToken = undefined;
-      user.passwordResetExpires = undefined;
+      user.resetPasswordToken = undefined;
+      user.resetPasswordExpire = undefined;
       await user.save();
 
       return successResponse(res, null, 'Password reset successfully');

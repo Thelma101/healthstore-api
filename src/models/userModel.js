@@ -90,22 +90,7 @@ const userSchema = new mongoose.Schema({
 
 
 
-userSchema.methods.createEmailVerificationToken = function () {
-    // Generate random token
-    const verificationToken = crypto.randomBytes(32).toString('hex');
 
-    // Hash the token and save to database
-    this.emailVerificationToken = crypto
-        .createHash('sha256')
-        .update(verificationToken)
-        .digest('hex');
-
-    // Set expiration (24 hours from now)
-    this.emailVerificationExpire = Date.now() + 24 * 60 * 60 * 1000;
-
-    // Return the plain token (not hashed) for email
-    return verificationToken;
-};
 
 
 
@@ -161,7 +146,8 @@ userSchema.methods = {
             .update(resetToken)
             .digest('hex');
 
-        this.resetPasswordExpire = Date.now() + 10 * 60 * 1000;
+        // 48 hours for testing
+        this.resetPasswordExpire = Date.now() + 48 * 60 * 60 * 1000;
 
         return resetToken;
     },
@@ -174,7 +160,8 @@ userSchema.methods = {
             .update(verificationToken)
             .digest('hex');
 
-        this.emailVerificationExpire = Date.now() + 24 * 60 * 60 * 1000;
+        // 48 hours for testing
+        this.emailVerificationExpire = Date.now() + 48 * 60 * 60 * 1000;
 
         return verificationToken;
     }

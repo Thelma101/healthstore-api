@@ -6,8 +6,7 @@ const {
   setAuthCookie,
   generateVerificationToken
 } = require('../utils/tokenUtils');
-const { sendPasswordResetEmail, passwordResetExpires } = require('../utils/emailSender');
-const { sendEmail } = require('../utils/emailSender');
+const { sendPasswordResetEmail, sendVerificationEmail } = require('../utils/emailSender');
 const {
   successResponse,
   createdResponse,
@@ -154,7 +153,7 @@ exports.signup = async (req, res) => {
     console.log('Current time:', new Date());
 
     console.log('Sending verification email to:', newUser.email);
-    await sendEmail(newUser.email, newUser.firstName, verificationToken);
+    await sendVerificationEmail(newUser.email, newUser.firstName, verificationToken);
 
     // 5) Generate JWT token for login
     const jwtToken = generateToken({ id: newUser._id });
@@ -575,8 +574,8 @@ exports.forgotPassword = async (req, res) => {
       .update(resetToken)
       .digest('hex');
     
-    user.passwordResetToken = hashedResetToken;
-    user.passwordResetExpires = Date.now() + 600000; // 10 minutes
+    user.resetPasswordToken = hashedResetToken;
+    user.resetPasswordExpire = Date.now() + 48 * 60 * 60 * 1000; // 48 hours for testing
     await user.save();
 
     // 4) Send password reset email
@@ -588,8 +587,8 @@ exports.forgotPassword = async (req, res) => {
       );
     } catch (emailErr) {
       // Clean up if email fails
-      user.passwordResetToken = undefined;
-      user.passwordResetExpires = undefined;
+      user.resetPasswordToken = undefined;
+      user.resetPasswordExpire = undefined;
       await user.save({ validateBeforeSave: false });
 
       console.error('Password reset email failed:', emailErr);
@@ -622,8 +621,8 @@ exports.resetPassword = async (req, res) => {
       .digest('hex');
     
     const user = await User.findOne({
-      passwordResetToken: hashedToken,
-      passwordResetExpires: { $gt: Date.now() }
+      resetPasswordToken: hashedToken,
+      resetPasswordExpire: { $gt: Date.now() }
     });
 
     if (!user) {
@@ -632,8 +631,8 @@ exports.resetPassword = async (req, res) => {
 
     // Update password
     user.password = newPassword;
-    user.passwordResetToken = undefined;
-    user.passwordResetExpires = undefined;
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpire = undefined;
     await user.save();
 
     return successResponse(res, null, "Password updated successfully");
