@@ -589,63 +589,107 @@ exports.forgotPassword = async (req, res) => {
   }
 };
 
-// In resetPassword method:
 exports.resetPassword = async (req, res) => {
   try {
-    // 1. Get token from params and password from body
     const { token } = req.params;
     const { password } = req.body;
 
-    // 2. Validate input
+    // Debug logs
+    console.log('Reset Password Request:', {
+      method: req.method,
+      headers: req.headers,
+      body: req.body,
+      params: req.params
+    });
+
     if (!password) {
-      return validationErrorResponse(res, [
-        { field: 'password', message: 'New password is required' }
+      return validationErrorResponse(res, 'reset-password', [
+        {message: 'New password is required',  token  }
       ]);
     }
 
-    // 3. Hash the token
     const hashedToken = crypto
       .createHash('sha256')
       .update(token)
       .digest('hex');
 
-    // 4. Find user with valid token
     const user = await User.findOne({
       resetPasswordToken: hashedToken,
       resetPasswordExpire: { $gt: Date.now() }
     }).select('+password');
 
-    // 5. Debug logging (fixed the undefined variable)
-    console.log('Token verification:', {
+    console.log('Token Verification Debug:', {
       inputToken: token,
       hashedToken,
-      storedToken: user?.resetPasswordToken, // Fixed: using user.resetPasswordToken
-      isValid: !!user,
-      expiresAt: user?.resetPasswordExpire
-        ? new Date(user.resetPasswordExpire)
-        : null
+      storedToken: user?.resetPasswordToken,
+      expiresAt: user?.resetPasswordExpires ? new Date(user.resetPasswordExpires) : null,
+      currentTime: new Date()
     });
 
-    // 6. Validate token
     if (!user) {
-      return badRequestResponse(res, "Invalid or expired token");
+      return badRequestResponse(res, "Invalid or expired token", token);
     }
 
-    // 7. Update password and clear reset token
     user.password = password;
     user.resetPasswordToken = undefined;
-    user.resetPasswordExpire = undefined;
+    user.resetPasswordExpires = undefined;
     user.passwordChangedAt = Date.now();
     await user.save();
 
-    // 8. Return success
     return successResponse(res, null, "Password updated successfully");
-
   } catch (err) {
     console.error('Reset password error:', err);
     return errorResponse(res, "Password reset failed");
   }
 };
+
+// exports.resetPassword = async (req, res) => {
+//   try {
+//     console.log('Reset Password Request Body:', req.body);
+
+//     const { token } = req.params;
+//     const { password } = req.body;
+
+//     if (!password) {
+//       return validationErrorResponse(res, [
+//         { field: 'password', message: 'New password is required' }
+//       ]);
+//     }
+
+//     const hashedToken = crypto
+//       .createHash('sha256')
+//       .update(token)
+//       .digest('hex');
+
+//     const user = await User.findOne({
+//       resetPasswordToken: hashedToken,
+//       resetPasswordExpire: { $gt: Date.now() }
+//     }).select('+password');
+
+//     console.log('Token Verification Debug:', {
+//       inputToken: token,
+//       hashedToken,
+//       storedToken: user?.resetPasswordToken,
+//       expiresAt: user?.resetPasswordExpire ? new Date(user.resetPasswordExpire) : null,
+//       currentTime: new Date()
+//     });
+
+//     if (!user) {
+//       return badRequestResponse(res, "Invalid or expired token");
+//     }
+
+//     user.password = password;
+//     user.resetPasswordToken = undefined;
+//     user.resetPasswordExpire = undefined;
+//     user.passwordChangedAt = Date.now();
+//     await user.save();
+
+//     return successResponse(res, null, "Password updated successfully");
+//   } catch (err) {
+//     console.error('Reset password error:', err);
+//     return errorResponse(res, "Password reset failed");
+//   }
+// };
 
 
 // exports.resetPassword = async (req, res) => {

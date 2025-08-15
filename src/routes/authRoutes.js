@@ -15,6 +15,10 @@ router.get('/reset-password/:token', authController.resetPassword);
 router.post('/forgot-password', authController.forgotPassword);
 router.post('/reset-password/:token', authController.resetPassword);
 router.get('/verify-email/:token', verificationController.verifyEmail);
+// In your routes
+// router.get('/reset-password/:token', (req, res) => {
+//   res.render('reset-password', { token: req.params.token });
+// });
 
 // Protected routes
 router.post('/logout/:id', authController.logout);
