@@ -121,6 +121,10 @@ userSchema.pre('save', async function (next) {
 
 // Query middleware to filter inactive users
 userSchema.pre(/^find/, function (next) {
+    const query = this.getQuery();
+    if (query && (query.emailVerificationToken || query.resetPasswordToken)) {
+        return next();
+    }
     this.find({ isActive: { $ne: false } });
     next();
 });
