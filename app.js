@@ -33,7 +33,7 @@ app.use(cookieParser());
 app.use(generalLimiter);
 
 // Body parsers
-app.use(express.json({ limit: '10kb' }));
+app.use(express.json({ limit: '30kb' }));
 app.use(express.urlencoded({ extended: true }));
 
 // Routes

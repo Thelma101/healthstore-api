@@ -40,7 +40,7 @@ const userSchema = new mongoose.Schema({
         select: false,
         validate: {
             // validator: (v) => /^(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{8,}$/.test(v),
-            validator: (v) =>/^(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[!@#$%^&*]).{8,}$/.test(v),
+            validator: (v) => /^(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[!@#$%^&*]).{8,}$/.test(v),
             message: 'Password must contain at least one uppercase, one lowercase, and one number'
         }
     },
@@ -78,17 +78,16 @@ const userSchema = new mongoose.Schema({
     profileImage: { type: String, default: 'default.jpg' },
     isEmailVerified: { type: Boolean, default: false },
     isActive: { type: Boolean, default: false, select: true },
-    passwordChangedAt: Date, // Added for password change tracking
+    emailVerificationToken: String,
+    emailVerificationExpire: Date,
+    passwordChangedAt: Date,
     resetPasswordToken: String,
     resetPasswordExpire: Date,
-    emailVerificationToken: String,
-    emailVerificationExpire: Date
 }, {
     timestamps: true,
     toJSON: { virtuals: true },
     toObject: { virtuals: true },
 });
-
 
 
 userSchema.methods.createEmailVerificationToken = function () {
@@ -125,21 +124,20 @@ userSchema.methods.verifyPassword = async function (candidatePassword) {
     return await bcrypt.compare(candidatePassword, this.password);
 };
 
-// Password handling middleware
 userSchema.pre('save', async function (next) {
     if (!this.isModified('password')) return next();
 
     this.password = await bcrypt.hash(this.password, 12);
     this.passwordConfirm = undefined;
-    this.passwordChangedAt = Date.now() - 1000; 
+    this.passwordChangedAt = Date.now() - 1000;
     next();
 });
 
 // Query middleware to filter inactive users
-userSchema.pre(/^find/, function (next) {
-    this.find({ isActive: { $ne: false } });
-    next();
-});
+// userSchema.pre(/^find/, function (next) {
+//     this.find({ isActive: { $ne: false } });
+//     next();
+// });
 
 // Instance methods
 userSchema.methods = {

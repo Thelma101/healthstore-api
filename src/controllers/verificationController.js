@@ -1,46 +1,49 @@
 const crypto = require('crypto');
 const User = require('../models/userModel');
-const { 
+const {
   successResponse,
   badRequestResponse,
-  errorResponse 
+  errorResponse
 } = require('../utils/apiResponse');
 
 exports.verifyEmail = async (req, res) => {
   try {
-    const { token } = req.params;
+    const tokenFromUrl = req.params.token;
+    
+    console.log('Verification attempt:', {
+      token: tokenFromUrl,
+      time: new Date()
+    });
+
     const hashedToken = crypto
       .createHash('sha256')
-      .update(token)
+      .update(tokenFromUrl)
       .digest('hex');
 
     const user = await User.findOne({
       emailVerificationToken: hashedToken,
       emailVerificationExpire: { $gt: Date.now() }
-    });
+    }).select('+emailVerificationToken +emailVerificationExpire');
 
-    console.log('Email verification:', {
-      inputToken: token,
-      hashedToken,
+    console.log('User verification status:', {
+      userExists: !!user,
       storedToken: user?.emailVerificationToken,
-      isValid: !!user,
       expiresAt: user?.emailVerificationExpire
-        ? new Date(user.emailVerificationExpire)
-        : null
     });
 
     if (!user) {
-      return badRequestResponse(res, 'Invalid or expired verification token');
+      return badRequestResponse(res, "Invalid or expired verification token");
     }
 
     user.isEmailVerified = true;
+    user.isActive = true;
     user.emailVerificationToken = undefined;
     user.emailVerificationExpire = undefined;
-    await user.save();
+    await user.save({ validateBeforeSave: false });
 
-    return successResponse(res, null, 'Email verified successfully');
+    return successResponse(res, null, "Email verified and account activated");
   } catch (err) {
     console.error('Email verification error:', err);
-    return errorResponse(res, 'Verification failed');
+    return errorResponse(res, "Email verification failed");
   }
 };

@@ -280,228 +280,197 @@ exports.verifyEmail = async (req, res) => {
   }
 };
 
-// exports.verifyEmail = async (req, res) => {
-//   try {
-//     // 1) Hash token from URL
-//     const hashedToken = crypto
-//       .createHash('sha256')
-//       .update(req.params.token)
-//       .digest('hex');
 
-//     // 2) Find user with valid token
-//     const user = await User.findOne({
-//       emailVerificationToken: hashedToken,
-//       emailVerificationExpire: { $gt: Date.now() }
-//     });
+exports.login = async (req, res) => {
+  try {
+    console.log('Login attempt for email:', req.body.email);
 
-//     if (!user) {
-//       return res.redirect(`${process.env.CLIENT_URL}/verification-failed`);
-//     }
+    const { email, password } = req.body;
 
-//     // 3) Mark as verified
-//     user.isEmailVerified = true;
-//     user.emailVerificationToken = undefined;
-//     user.emailVerificationExpire = undefined;
-//     await user.save();
+    // 1) Validate input
+    if (!email || !password) {
+      console.log('Validation failed - missing email or password');
+      return res.status(400).json({
+        success: false,
+        message: 'Validation failed',
+        errors: [
+          { field: 'email', message: 'Email is required' },
+          { field: 'password', message: 'Password is required' }
+        ]
+      });
+    }
 
-//     // 4) Redirect to success page
-//     return res.redirect(`${process.env.CLIENT_URL}/verification-success`);
+    // 2) Check if user exists
+    const user = await User.findOne({ email }).select('+password');
+    if (!user) {
+      console.log('User not found for email:', email);
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication failed',
+        errors: [{
+          field: 'email',
+          message: 'Invalid email or password'
+        }]
+      });
+    }
 
-//   } catch (err) {
-//     return res.redirect(`${process.env.CLIENT_URL}/verification-error`);
-//   }
-// };
+    // 3) Verify password
+    const isPasswordValid = await user.verifyPassword(password);
+    if (!isPasswordValid) {
+      console.log('Invalid password for user:', user.email);
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication failed',
+        errors: [{
+          field: 'password',
+          message: 'Invalid email or password'
+        }]
+      });
+    }
 
-// exports.login = async (req, res) => {
-//   try {
-//     console.log('Login attempt for email:', req.body.email);
+    // 4) Check if email is verified
+    if (!user.isEmailVerified) {
+      console.log('Email not verified for user:', user.email);
+      return res.status(403).json({
+        success: false,
+        message: 'Authentication failed',
+        errors: [{
+          field: 'email',
+          message: 'Please verify your email first'
+        }]
+      });
+    }
 
-//     const { email, password } = req.body;
+    // 5) Generate token
+    const token = generateToken({
+      id: user._id,
+      email: user.email,
+      role: user.role
+    });
 
-//     // 1) Validate input
-//     if (!email || !password) {
-//       console.log('Validation failed - missing email or password');
-//       return res.status(400).json({
-//         success: false,
-//         message: 'Validation failed',
-//         errors: [
-//           { field: 'email', message: 'Email is required' },
-//           { field: 'password', message: 'Password is required' }
-//         ]
-//       });
-//     }
+    // 6) Update last login
+    user.lastLogin = Date.now();
+    await user.save({ validateBeforeSave: false });
 
-//     // 2) Check if user exists
-//     const user = await User.findOne({ email }).select('+password');
-//     if (!user) {
-//       console.log('User not found for email:', email);
-//       return res.status(401).json({
-//         success: false,
-//         message: 'Authentication failed',
-//         errors: [{
-//           field: 'email',
-//           message: 'Invalid email or password'
-//         }]
-//       });
-//     }
+    // 7) Format response
+    console.log('Successful login for user:', user.email);
+    return res.status(200).json({
+      success: true,
+      message: 'Login successful',
+      data: {
+        token,
+        user: {
+          fullName: `${user.firstName} ${user.lastName}`,
+          email: user.email,
+          phone: user.phone,
+          role: user.role,
+          id: user._id,
+        }
+      }
+    });
 
-//     // 3) Verify password
-//     const isPasswordValid = await user.verifyPassword(password);
-//     if (!isPasswordValid) {
-//       console.log('Invalid password for user:', user.email);
-//       return res.status(401).json({
-//         success: false,
-//         message: 'Authentication failed',
-//         errors: [{
-//           field: 'password',
-//           message: 'Invalid email or password'
-//         }]
-//       });
-//     }
+  } catch (err) {
+    console.error('Login error:', {
+      message: err.message,
+      stack: err.stack,
+      body: req.body
+    });
 
-//     // 4) Check if email is verified
-//     if (!user.isEmailVerified) {
-//       console.log('Email not verified for user:', user.email);
-//       return res.status(403).json({
-//         success: false,
-//         message: 'Authentication failed',
-//         errors: [{
-//           field: 'email',
-//           message: 'Please verify your email first'
-//         }]
-//       });
-//     }
+    return res.status(500).json({
+      success: false,
+      message: 'Login failed',
+      errors: [{
+        message: err.message,
+        ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
+      }]
+    });
+  }
+};
 
-//     // 5) Generate token
-//     const token = generateToken({
-//       id: user._id,
-//       email: user.email,
-//       role: user.role
-//     });
+exports.login = async (req, res) => {
+  try {
+    const { email, password } = req.body;
 
-//     // 6) Update last login
-//     user.lastLogin = Date.now();
-//     await user.save({ validateBeforeSave: false });
+    // 1) Validate input
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation failed',
+        errors: [
+          { field: 'email', message: 'Email is required' },
+          { field: 'password', message: 'Password is required' }
+        ]
+      });
+    }
 
-//     // 7) Format response
-//     console.log('Successful login for user:', user.email);
-//     return res.status(200).json({
-//       success: true,
-//       message: 'Login successful',
-//       data: {
-//         token,
-//         user: {
-//           fullName: `${user.firstName} ${user.lastName}`,
-//           email: user.email,
-//           phone: user.phone,
-//           role: user.role,
-//           id: user._id,
-//         }
-//       }
-//     });
+    // 2) Check if user exists
+    const user = await User.findOne({ email }).select('+password');
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication failed',
+        errors: [{ 
+          field: 'email', 
+          message: 'Invalid email or password' 
+        }]
+      });
+    }
 
-//   } catch (err) {
-//     console.error('Login error:', {
-//       message: err.message,
-//       stack: err.stack,
-//       body: req.body
-//     });
+    // 3) Verify password
+    const isPasswordValid = await user.verifyPassword(password);
+    if (!isPasswordValid) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication failed',
+        errors: [{ 
+          field: 'password', 
+          message: 'Invalid email or password' 
+        }]
+      });
+    }
 
-//     return res.status(500).json({
-//       success: false,
-//       message: 'Login failed',
-//       errors: [{
-//         message: err.message,
-//         ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
-//       }]
-//     });
-//   }
-// };
+    // 4) Check if email is verified
+    if (!user.isEmailVerified) {
+      return res.status(403).json({
+        success: false,
+        message: 'Authentication failed',
+        errors: [{ 
+          field: 'email', 
+          message: 'Please verify your email first' 
+        }]
+      });
+    }
 
-// exports.login = async (req, res) => {
-//   try {
-//     const { email, password } = req.body;
+    // 5) Generate token
+    const token = user.generateAuthToken();
 
-//     // 1) Validate input
-//     if (!email || !password) {
-//       return res.status(400).json({
-//         success: false,
-//         message: 'Validation failed',
-//         errors: [
-//           { field: 'email', message: 'Email is required' },
-//           { field: 'password', message: 'Password is required' }
-//         ]
-//       });
-//     }
+    // 6) Update last login
+    user.lastLogin = Date.now();
+    await user.save({ validateBeforeSave: false });
 
-//     // 2) Check if user exists
-//     const user = await User.findOne({ email }).select('+password');
-//     if (!user) {
-//       return res.status(401).json({
-//         success: false,
-//         message: 'Authentication failed',
-//         errors: [{ 
-//           field: 'email', 
-//           message: 'Invalid email or password' 
-//         }]
-//       });
-//     }
+    // 7) Format response
+    return res.status(200).json({
+      success: true,
+      message: 'Login successful',
+      data: {
+        token,
+        user: {
+          id: user._id,
+          firstName: user.firstName,
+          email: user.email,
+          role: user.role
+        }
+      }
+    });
 
-//     // 3) Verify password
-//     const isPasswordValid = await user.verifyPassword(password);
-//     if (!isPasswordValid) {
-//       return res.status(401).json({
-//         success: false,
-//         message: 'Authentication failed',
-//         errors: [{ 
-//           field: 'password', 
-//           message: 'Invalid email or password' 
-//         }]
-//       });
-//     }
-
-//     // 4) Check if email is verified
-//     if (!user.isEmailVerified) {
-//       return res.status(403).json({
-//         success: false,
-//         message: 'Authentication failed',
-//         errors: [{ 
-//           field: 'email', 
-//           message: 'Please verify your email first' 
-//         }]
-//       });
-//     }
-
-//     // 5) Generate token
-//     const token = user.generateAuthToken();
-
-//     // 6) Update last login
-//     user.lastLogin = Date.now();
-//     await user.save({ validateBeforeSave: false });
-
-//     // 7) Format response
-//     return res.status(200).json({
-//       success: true,
-//       message: 'Login successful',
-//       data: {
-//         token,
-//         user: {
-//           id: user._id,
-//           firstName: user.firstName,
-//           email: user.email,
-//           role: user.role
-//         }
-//       }
-//     });
-
-//   } catch (err) {
-//     return res.status(500).json({
-//       success: false,
-//       message: 'Login failed',
-//       errors: [{ message: err.message }]
-//     });
-//   }
-// };
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      message: 'Login failed',
+      errors: [{ message: err.message }]
+    });
+  }
+};
 
 
 exports.login = async (req, res) => {
@@ -561,7 +530,7 @@ exports.login = async (req, res) => {
     return successResponse(res, { user: userData, token }, 'Login successful');
 
   } catch (err) {
-    return errorResponse(res, 'Login failed: ' + err.message);
+    return errorResponse(res, 'Login failed: ' + err.message + err.stack);
   }
 };
 
@@ -603,7 +572,7 @@ exports.forgotPassword = async (req, res) => {
       console.log('Password Reset Token:', {
         plainToken: resetToken,
         hashedToken: user.resetPasswordToken,
-        expiresAt: new Date(user.resetPasswordExpires)
+        expiresAt: new Date(user.resetPasswordExpire)
       });
 
       await sendPasswordResetEmail(
@@ -623,44 +592,55 @@ exports.forgotPassword = async (req, res) => {
 // In resetPassword method:
 exports.resetPassword = async (req, res) => {
   try {
+    // 1. Get token from params and password from body
     const { token } = req.params;
-    const { newPassword } = req.body;
+    const { password } = req.body;
 
-    if (!newPassword) {
+    // 2. Validate input
+    if (!password) {
       return validationErrorResponse(res, [
-        { field: 'newPassword', message: 'New password is required' }
+        { field: 'password', message: 'New password is required' }
       ]);
     }
+
+    // 3. Hash the token
     const hashedToken = crypto
       .createHash('sha256')
       .update(token)
       .digest('hex');
 
+    // 4. Find user with valid token
     const user = await User.findOne({
       resetPasswordToken: hashedToken,
-      resetPasswordExpires: { $gt: Date.now() }
-    });
+      resetPasswordExpire: { $gt: Date.now() }
+    }).select('+password');
 
+    // 5. Debug logging (fixed the undefined variable)
     console.log('Token verification:', {
       inputToken: token,
       hashedToken,
-      storedToken: user?.resetPasswordToken,
+      storedToken: user?.resetPasswordToken, // Fixed: using user.resetPasswordToken
       isValid: !!user,
-      expiresAt: user?.resetPasswordExpires
-        ? new Date(user.resetPasswordExpires)
+      expiresAt: user?.resetPasswordExpire
+        ? new Date(user.resetPasswordExpire)
         : null
     });
 
+    // 6. Validate token
     if (!user) {
       return badRequestResponse(res, "Invalid or expired token");
     }
 
+    // 7. Update password and clear reset token
     user.password = password;
     user.resetPasswordToken = undefined;
-    user.resetPasswordExpires = undefined;
+    user.resetPasswordExpire = undefined;
+    user.passwordChangedAt = Date.now();
     await user.save();
 
+    // 8. Return success
     return successResponse(res, null, "Password updated successfully");
+
   } catch (err) {
     console.error('Reset password error:', err);
     return errorResponse(res, "Password reset failed");
