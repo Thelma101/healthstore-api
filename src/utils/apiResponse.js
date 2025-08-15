@@ -29,7 +29,7 @@ const errorResponse = (res, message = 'Internal Server Error', statusCode = 500,
 };
 
 const badRequestResponse = (res, message = 'Bad Request', errors = []) => {
-  return errorResponse(res, message, 400, errors);
+  return errorResponse(res, message, 400, errors + errors.stack);
 };
 
 const unauthorizedResponse = (res, message = 'Unauthorized') => {

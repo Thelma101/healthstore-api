@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const authController = require('../controllers/authController');
 const verificationController = require('../controllers/verificationController');
+const viewController = require('../controllers/viewController');
 
 // Public routes
 router.post('/register', authController.signup);
@@ -12,13 +13,18 @@ router.post('/login', authController.login);
 // router.post('/forgot-password', authController.forgotPassword);
 router.get('/reset-password/:token', authController.resetPassword); 
 
+// router.post('/forgot-password', authController.forgotPassword);
+// router.post('/reset-password/:token', authController.resetPassword);
+router.get('/verify-email/:token', verificationController.verifyEmail);
+
+// API Endpoints
 router.post('/forgot-password', authController.forgotPassword);
 router.post('/reset-password/:token', authController.resetPassword);
-router.get('/verify-email/:token', verificationController.verifyEmail);
-// In your routes
-// router.get('/reset-password/:token', (req, res) => {
-//   res.render('reset-password', { token: req.params.token });
-// });
+
+// Frontend Routes
+router.get('/reset-password', viewController.getResetPasswordPage);
+
+module.exports = router;
 
 // Protected routes
 router.post('/logout/:id', authController.logout);

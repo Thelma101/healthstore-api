@@ -203,82 +203,82 @@ exports.signup = async (req, res) => {
 };
 
 
-exports.verifyEmail = async (req, res) => {
-  try {
-    const tokenFromUrl = req.params.token;
+// exports.verifyEmail = async (req, res) => {
+//   try {
+//     const tokenFromUrl = req.params.token;
     
-    // Debug logs
-    console.log('=== EMAIL VERIFICATION DEBUG ===');
-    console.log('Received plain token:', tokenFromUrl);
-    console.log('Current server time:', new Date());
+//     // Debug logs
+//     console.log('=== EMAIL VERIFICATION DEBUG ===');
+//     console.log('Received plain token:', tokenFromUrl);
+//     console.log('Current server time:', new Date());
 
-    // 1. Hash the incoming token
-    const hashedToken = crypto
-      .createHash('sha256')
-      .update(tokenFromUrl)
-      .digest('hex');
-    console.log('Computed hash:', hashedToken);
+//     // 1. Hash the incoming token
+//     const hashedToken = crypto
+//       .createHash('sha256')
+//       .update(tokenFromUrl)
+//       .digest('hex');
+//     console.log('Computed hash:', hashedToken);
 
-    // 2. Find user with valid token
-    const user = await User.findOne({
-      emailVerificationToken: hashedToken,
-      emailVerificationExpire: { $gt: Date.now() - 30000 } // 30s buffer for clock skew
-    }).select('+emailVerificationToken +emailVerificationExpire');
+//     // 2. Find user with valid token
+//     const user = await User.findOne({
+//       emailVerificationToken: hashedToken,
+//       emailVerificationExpire: { $gt: Date.now() - 30000 } // 30s buffer for clock skew
+//     }).select('+emailVerificationToken +emailVerificationExpire');
 
-    // Debug logs
-    if (user) {
-      console.log('Token details:', {
-        storedHash: user.emailVerificationToken,
-        expiresAt: new Date(user.emailVerificationExpire),
-        matches: user.emailVerificationToken === hashedToken,
-        valid: user.emailVerificationExpire > Date.now()
-      });
-    } else {
-      console.log('No user found with valid token');
-    }
+//     // Debug logs
+//     if (user) {
+//       console.log('Token details:', {
+//         storedHash: user.emailVerificationToken,
+//         expiresAt: new Date(user.emailVerificationExpire),
+//         matches: user.emailVerificationToken === hashedToken,
+//         valid: user.emailVerificationExpire > Date.now()
+//       });
+//     } else {
+//       console.log('No user found with valid token');
+//     }
 
-    // 3. Validate token
-    if (!user) {
-      return badRequestResponse(res, {
-        success: false,
-        message: "Invalid or expired verification token",
-        debug: process.env.NODE_ENV === 'development' ? {
-          receivedToken: tokenFromUrl,
-          computedHash: hashedToken,
-          currentTime: new Date()
-        } : undefined
-      });
-    }
+//     // 3. Validate token
+//     if (!user) {
+//       return badRequestResponse(res, {
+//         success: false,
+//         message: "Invalid or expired verification token",
+//         debug: process.env.NODE_ENV === 'development' ? {
+//           receivedToken: tokenFromUrl,
+//           computedHash: hashedToken,
+//           currentTime: new Date()
+//         } : undefined
+//       });
+//     }
 
-    // 4. Mark as verified
-    user.isEmailVerified = true;
-    user.emailVerificationToken = undefined;
-    user.emailVerificationExpire = undefined;
-    await user.save({ validateBeforeSave: false });
+//     // 4. Mark as verified
+//     user.isEmailVerified = true;
+//     user.emailVerificationToken = undefined;
+//     user.emailVerificationExpire = undefined;
+//     await user.save({ validateBeforeSave: false });
 
-    // 5. Return response
-    return successResponse(res, {
-      success: true,
-      email: user.email,
-      verifiedAt: new Date()
-    }, 'Email verified successfully');
+//     // 5. Return response
+//     return successResponse(res, {
+//       success: true,
+//       email: user.email,
+//       verifiedAt: new Date()
+//     }, 'Email verified successfully');
 
-  } catch (err) {
-    console.error('EMAIL VERIFICATION ERROR:', {
-      error: err.message,
-      stack: err.stack,
-      token: req.params.token,
-      timestamp: new Date()
-    });
+//   } catch (err) {
+//     console.error('EMAIL VERIFICATION ERROR:', {
+//       error: err.message,
+//       stack: err.stack,
+//       token: req.params.token,
+//       timestamp: new Date()
+//     });
     
-    return errorResponse(res, {
-      success: false,
-      message: "Email verification failed",
-      systemError: process.env.NODE_ENV === 'development' ? err.message : undefined,
-      timestamp: new Date()
-    });
-  }
-};
+//     return errorResponse(res, {
+//       success: false,
+//       message: "Email verification failed",
+//       systemError: process.env.NODE_ENV === 'development' ? err.message : undefined,
+//       timestamp: new Date()
+//     });
+//   }
+// };
 
 
 exports.login = async (req, res) => {
@@ -589,22 +589,17 @@ exports.forgotPassword = async (req, res) => {
   }
 };
 
+// In resetPassword method:
 exports.resetPassword = async (req, res) => {
   try {
+    console.log('Reset Password Request Body:', req.body); // Debug log
+
     const { token } = req.params;
     const { password } = req.body;
 
-    // Debug logs
-    console.log('Reset Password Request:', {
-      method: req.method,
-      headers: req.headers,
-      body: req.body,
-      params: req.params
-    });
-
     if (!password) {
-      return validationErrorResponse(res, 'reset-password', [
-        {message: 'New password is required',  token  }
+      return validationErrorResponse(res, [
+        { field: 'password', message: 'New password is required' }
       ]);
     }
 
@@ -622,12 +617,12 @@ exports.resetPassword = async (req, res) => {
       inputToken: token,
       hashedToken,
       storedToken: user?.resetPasswordToken,
-      expiresAt: user?.resetPasswordExpires ? new Date(user.resetPasswordExpires) : null,
+      expiresAt: user?.resetPasswordExpires ? new Date(user.resetPasswordExpire) : null,
       currentTime: new Date()
     });
 
     if (!user) {
-      return badRequestResponse(res, "Invalid or expired token", token);
+      return badRequestResponse(res, "Invalid or expired token");
     }
 
     user.password = password;
@@ -642,54 +637,6 @@ exports.resetPassword = async (req, res) => {
     return errorResponse(res, "Password reset failed");
   }
 };
-
-// exports.resetPassword = async (req, res) => {
-//   try {
-//     console.log('Reset Password Request Body:', req.body);
-
-//     const { token } = req.params;
-//     const { password } = req.body;
-
-//     if (!password) {
-//       return validationErrorResponse(res, [
-//         { field: 'password', message: 'New password is required' }
-//       ]);
-//     }
-
-//     const hashedToken = crypto
-//       .createHash('sha256')
-//       .update(token)
-//       .digest('hex');
-
-//     const user = await User.findOne({
-//       resetPasswordToken: hashedToken,
-//       resetPasswordExpire: { $gt: Date.now() }
-//     }).select('+password');
-
-//     console.log('Token Verification Debug:', {
-//       inputToken: token,
-//       hashedToken,
-//       storedToken: user?.resetPasswordToken,
-//       expiresAt: user?.resetPasswordExpire ? new Date(user.resetPasswordExpire) : null,
-//       currentTime: new Date()
-//     });
-
-//     if (!user) {
-//       return badRequestResponse(res, "Invalid or expired token");
-//     }
-
-//     user.password = password;
-//     user.resetPasswordToken = undefined;
-//     user.resetPasswordExpire = undefined;
-//     user.passwordChangedAt = Date.now();
-//     await user.save();
-
-//     return successResponse(res, null, "Password updated successfully");
-//   } catch (err) {
-//     console.error('Reset password error:', err);
-//     return errorResponse(res, "Password reset failed");
-//   }
-// };
 
 
 // exports.resetPassword = async (req, res) => {
