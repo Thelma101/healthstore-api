@@ -6,5 +6,7 @@ const adminRoutes = require('./adminRoutes');
 // Mount routes
 router.use('/auth', authRoutes);
 router.use('/admin', adminRoutes);
+router.use('/drugs', drugRoutes);
+
 
 module.exports = router;
