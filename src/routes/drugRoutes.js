@@ -1,6 +1,7 @@
 const express = require('express');
 const drugController = require('../controllers/drugController');
 const authController = require('../controllers/authController');
+const authMiddleware = require('../middleware/authMiddleware');
 
 const router = express.Router();
 
@@ -11,10 +12,12 @@ router.get('/category/:category', drugController.getDrugsByCategory);
 router.get('/:id', drugController.getDrug);
 
 // Protected routes (require authentication)
-router.use(authController.protect);
+router.use(authMiddleware.protect);
+// Add this new route
+// router.get('/subcategory/:subcategory', drugController.getDrugsBySubcategory);
 
-// Restricted to admin and pharmacist roles
-router.use(authController.restrictTo('admin', 'pharmacist'));
+// Restricted to admins
+// router.use(authController.restrictTo('admin', 'superadmin'));
 
 router.post('/', drugController.createDrug);
 router.patch('/:id', drugController.updateDrug);

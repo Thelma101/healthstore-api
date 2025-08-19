@@ -1,4 +1,3 @@
-// src/controllers/adminController.js
 const User = require('../models/userModel');
 const {
   successResponse,

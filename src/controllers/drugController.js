@@ -9,7 +9,7 @@ const {
   validationErrorResponse,
   conflictResponse,
   errorResponse
-} = require('../utils/responseHelpers');
+} = require('../utils/apiResponse');
 
 // Helper function for filtering, sorting, limiting fields, and pagination
 const apiFeatures = async (req, query) => {

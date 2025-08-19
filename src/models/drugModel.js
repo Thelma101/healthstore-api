@@ -137,8 +137,8 @@ const slugify = require('slugify');
 
 
 
-const mongoose = require('mongoose');
-const slugify = require('slugify');
+// const mongoose = require('mongoose');
+// const slugify = require('slugify');
 
 const drugSchema = new mongoose.Schema({
   name: {
@@ -237,9 +237,6 @@ drugSchema.pre(/^find/, function(next) {
   this.populate({
     path: 'category',
     select: 'name description'
-  }).populate({
-    path: 'subCategories',
-    select: 'name'
   });
   next();
 });
