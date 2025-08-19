@@ -81,6 +81,158 @@ exports.getDrug = async (req, res) => {
   }
 };
 
+// Add these new methods to your existing controller
+
+exports.uploadDrugImages = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { images } = req.body;
+
+    if (!images || !Array.isArray(images)) {
+      return badRequestResponse(res, 'Images array is required');
+    }
+
+    const drug = await Drug.findById(id);
+    if (!drug) {
+      return notFoundResponse(res, 'Drug not found');
+    }
+
+    // Process new images
+    const newImages = images.map(img => ({
+      url: img.url,
+      caption: img.caption || '',
+      isPrimary: img.isPrimary || false
+    }));
+
+    // If any image is marked as primary, unset others as primary
+    if (newImages.some(img => img.isPrimary)) {
+      drug.images.forEach(img => { img.isPrimary = false; });
+    }
+
+    drug.images.push(...newImages);
+    await drug.save();
+
+    return successResponse(res, drug, 'Images uploaded successfully');
+  } catch (err) {
+    return errorResponse(res, 'Failed to upload images: ' + err.message);
+  }
+};
+
+exports.setPrimaryImage = async (req, res) => {
+  try {
+    const { id, imageId } = req.params;
+
+    const drug = await Drug.findById(id);
+    if (!drug) {
+      return notFoundResponse(res, 'Drug not found');
+    }
+
+    // Find the image to set as primary
+    const imageToSet = drug.images.id(imageId);
+    if (!imageToSet) {
+      return notFoundResponse(res, 'Image not found');
+    }
+
+    // Unset all other primary images
+    drug.images.forEach(img => {
+      img.isPrimary = img._id.equals(imageId);
+    });
+
+    await drug.save();
+
+    return successResponse(res, drug, 'Primary image set successfully');
+  } catch (err) {
+    return errorResponse(res, 'Failed to set primary image: ' + err.message);
+  }
+};
+
+exports.deleteImage = async (req, res) => {
+  try {
+    const { id, imageId } = req.params;
+
+    const drug = await Drug.findById(id);
+    if (!drug) {
+      return notFoundResponse(res, 'Drug not found');
+    }
+
+    // Remove the image
+    drug.images.pull(imageId);
+    await drug.save();
+
+    return successResponse(res, drug, 'Image deleted successfully');
+  } catch (err) {
+    return errorResponse(res, 'Failed to delete image: ' + err.message);
+  }
+};
+
+// Update your createDrug and updateDrug methods to handle images
+exports.createDrug = async (req, res) => {
+  try {
+    const { images = [], ...drugData } = req.body;
+
+    // Check for existing drug
+    const existingDrug = await Drug.findOne({ name: drugData.name });
+    if (existingDrug) {
+      return conflictResponse(res, 'Drug with this name already exists');
+    }
+
+    // Process images if provided
+    const processedImages = images.map(img => ({
+      url: img.url,
+      caption: img.caption || '',
+      isPrimary: img.isPrimary || false
+    }));
+
+    // Ensure only one primary image
+    if (processedImages.filter(img => img.isPrimary).length > 1) {
+      return badRequestResponse(res, 'Only one image can be primary');
+    }
+
+    const newDrug = await Drug.create({
+      ...drugData,
+      images: processedImages
+    });
+
+    return createdResponse(res, newDrug, 'Drug created successfully');
+  } catch (err) {
+    // ... existing error handling ...
+  }
+};
+
+exports.updateDrug = async (req, res) => {
+  try {
+    const { images, ...updateData } = req.body;
+    const { id } = req.params;
+
+    // ... existing update logic ...
+
+    if (images) {
+      const processedImages = images.map(img => ({
+        url: img.url,
+        caption: img.caption || '',
+        isPrimary: img.isPrimary || false
+      }));
+
+      // Ensure only one primary image
+      if (processedImages.filter(img => img.isPrimary).length > 1) {
+        return badRequestResponse(res, 'Only one image can be primary');
+      }
+
+      updateData.images = processedImages;
+    }
+
+    const updatedDrug = await Drug.findByIdAndUpdate(
+      id,
+      updateData,
+      { new: true, runValidators: true }
+    );
+
+    return successResponse(res, updatedDrug, 'Drug updated successfully');
+  } catch (err) {
+    // ... existing error handling ...
+  }
+};
+
 exports.createDrug = async (req, res) => {
   try {
     const {
@@ -96,7 +248,7 @@ exports.createDrug = async (req, res) => {
       expiryDate
     } = req.body;
 
-    // Check for existing drug with same name
+    
     const existingDrug = await Drug.findOne({ name });
     if (existingDrug) {
       return conflictResponse(res, 'Drug with this name already exists', [
@@ -140,162 +292,3 @@ exports.createDrug = async (req, res) => {
   }
 };
 
-exports.updateDrug = async (req, res) => {
-  try {
-    const {
-      name,
-      description,
-      category,
-      price,
-      quantity,
-      dosage,
-      prescriptionRequired,
-      sideEffects,
-      manufacturer,
-      expiryDate
-    } = req.body;
-
-    // Check if drug exists
-    const drug = await Drug.findById(req.params.id);
-    if (!drug) {
-      return notFoundResponse(res, 'Drug not found');
-    }
-
-    // Check for name conflict with other drugs
-    if (name && name !== drug.name) {
-      const existingDrug = await Drug.findOne({ name });
-      if (existingDrug) {
-        return conflictResponse(res, 'Drug with this name already exists', [
-          { field: 'name', message: 'Drug name must be unique' }
-        ]);
-      }
-    }
-
-    const updatedDrug = await Drug.findByIdAndUpdate(
-      req.params.id,
-      {
-        name,
-        description,
-        category,
-        price,
-        quantity,
-        dosage,
-        prescriptionRequired,
-        sideEffects,
-        manufacturer,
-        expiryDate,
-        updatedAt: Date.now()
-      },
-      {
-        new: true,
-        runValidators: true
-      }
-    );
-
-    return successResponse(res, updatedDrug, 'Drug updated successfully');
-
-  } catch (err) {
-    // Handle validation errors
-    if (err.name === 'ValidationError') {
-      const errors = Object.values(err.errors).map(e => ({
-        field: e.path,
-        message: e.message
-      }));
-      return validationErrorResponse(res, errors);
-    }
-
-    // Handle duplicate name error
-    if (err.code === 11000) {
-      return conflictResponse(res, 'Drug name already exists', [
-        { field: 'name', message: 'Drug name must be unique' }
-      ]);
-    }
-
-    return errorResponse(res, 'Failed to update drug: ' + err.message);
-  }
-};
-
-exports.deleteDrug = async (req, res) => {
-  try {
-    const drug = await Drug.findByIdAndDelete(req.params.id);
-
-    if (!drug) {
-      return notFoundResponse(res, 'Drug not found');
-    }
-
-    return noContentResponse(res);
-
-  } catch (err) {
-    return errorResponse(res, 'Failed to delete drug: ' + err.message);
-  }
-};
-
-exports.searchDrugs = async (req, res) => {
-  try {
-    const { query } = req.query;
-
-    if (!query) {
-      return badRequestResponse(res, 'Search query is required');
-    }
-
-    const drugs = await Drug.find({
-      $text: { $search: query }
-    }).select('name description category price');
-
-    return successResponse(res, {
-      results: drugs.length,
-      data: drugs
-    });
-
-  } catch (err) {
-    return errorResponse(res, 'Search failed: ' + err.message);
-  }
-};
-
-exports.getDrugsByCategory = async (req, res) => {
-  try {
-    const { category } = req.params;
-
-    const drugs = await Drug.find({ category });
-
-    return successResponse(res, {
-      results: drugs.length,
-      data: drugs
-    });
-
-  } catch (err) {
-    return errorResponse(res, 'Failed to fetch drugs by category: ' + err.message);
-  }
-};
-
-exports.checkLowStock = async (req, res) => {
-  try {
-    const lowStockDrugs = await Drug.find({
-      quantity: { $lte: 10 } // Assuming 10 is the threshold for low stock
-    }).select('name quantity');
-
-    return successResponse(res, {
-      results: lowStockDrugs.length,
-      data: lowStockDrugs
-    });
-
-  } catch (err) {
-    return errorResponse(res, 'Failed to check low stock: ' + err.message);
-  }
-};
-
-exports.checkExpiredDrugs = async (req, res) => {
-  try {
-    const expiredDrugs = await Drug.find({
-      expiryDate: { $lt: new Date() }
-    }).select('name expiryDate quantity');
-
-    return successResponse(res, {
-      results: expiredDrugs.length,
-      data: expiredDrugs
-    });
-
-  } catch (err) {
-    return errorResponse(res, 'Failed to check expired drugs: ' + err.message);
-  }
-};

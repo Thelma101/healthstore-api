@@ -154,12 +154,26 @@ const drugSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Description is required']
   },
+  images: [{
+    url: {
+      type: String,
+      required: [true, 'Image URL is required']
+    },
+    caption: {
+      type: String,
+      default: ''
+    },
+    isPrimary: {
+      type: Boolean,
+      default: false
+    }
+  }],
   category: {
     type: String,
     required: [true, 'Category is required'],
     enum: [
-      'antibiotics', 
-      'analgesics', 
+      'antibiotics',
+      'analgesics',
       'antivirals',
       'antidepressants',
       'vaccines',
@@ -208,13 +222,13 @@ const drugSchema = new mongoose.Schema({
 });
 
 // Create drug slug from name
-drugSchema.pre('save', function(next) {
+drugSchema.pre('save', function (next) {
   this.slug = slugify(this.name, { lower: true });
   next();
 });
 
 // Update timestamp on modification
-drugSchema.pre('findOneAndUpdate', function(next) {
+drugSchema.pre('findOneAndUpdate', function (next) {
   this.set({ updatedAt: new Date() });
   next();
 });
@@ -227,13 +241,13 @@ drugSchema.index({ slug: 1 });
 drugSchema.index({ name: 'text', genericName: 'text', description: 'text' });
 
 // Document middleware
-drugSchema.pre('save', function(next) {
+drugSchema.pre('save', function (next) {
   this.slug = slugify(this.name, { lower: true });
   next();
 });
 
 // Query middleware
-drugSchema.pre(/^find/, function(next) {
+drugSchema.pre(/^find/, function (next) {
   this.populate({
     path: 'category',
     select: 'name description'
@@ -248,16 +262,16 @@ drugSchema.virtual('reviews', {
   localField: '_id'
 });
 
-drugSchema.virtual('isExpired').get(function() {
+drugSchema.virtual('isExpired').get(function () {
   return this.expiryDate < Date.now();
 });
 
-drugSchema.virtual('isLowStock').get(function() {
+drugSchema.virtual('isLowStock').get(function () {
   return this.quantity <= this.restockThreshold;
 });
 
 // Instance method
-drugSchema.methods.isPrescriptionRequired = function() {
+drugSchema.methods.isPrescriptionRequired = function () {
   return this.requiresPrescription || this.dosageForm === 'Injection';
 };
 

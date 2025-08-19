@@ -10,7 +10,7 @@ router.get('/', drugController.getAllDrugs);
 router.get('/search', drugController.searchDrugs);
 router.get('/category/:category', drugController.getDrugsByCategory);
 router.get('/:id', drugController.getDrug);
-
+router.post('/:id/images', drugController.uploadDrugImages);
 // Protected routes (require authentication)
 router.use(authMiddleware.protect);
 // Add this new route
