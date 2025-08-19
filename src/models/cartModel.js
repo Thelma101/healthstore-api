@@ -30,7 +30,7 @@ const cartSchema = new mongoose.Schema({
   user: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: [true, 'A cart must belong to a user'],
+    required: [true, 'User is required'],
     unique: true
   },
   items: [cartItemSchema],
@@ -55,6 +55,13 @@ const cartSchema = new mongoose.Schema({
 cartSchema.index({ user: 1 });
 
 // Virtuals
+cartSchema.virtual('userDisplayName').get(function() {
+  if (this.user && this.user.firstName && this.user.lastName) {
+    return `${this.user.firstName} ${this.user.lastName}`;
+  }
+  return 'Unknown User';
+});
+
 cartSchema.virtual('totalItems').get(function() {
   return this.items.reduce((sum, item) => sum + item.quantity, 0);
 });
@@ -67,6 +74,10 @@ cartSchema.virtual('total').get(function() {
   const subtotal = this.subtotal;
   const discount = this.coupon ? this.coupon.discount : 0;
   return subtotal - discount;
+});
+
+cartSchema.virtual('formattedTotal').get(function() {
+  return this.totalAmount ? `₦${this.totalAmount.toLocaleString()}` : '₦0';
 });
 
 // Document middleware
