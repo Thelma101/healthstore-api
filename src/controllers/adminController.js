@@ -8,7 +8,10 @@ const {
 exports.getAllUsers = async (req, res) => {
   try {
     const users = await User.find().select('-password');
-    return successResponse(res, users, "Users retrieved successfully");
+    return successResponse(res, {
+      results: users.length,
+      data: users
+    }, "Users retrieved successfully");
   } catch (err) {
     console.error('Get all users error:', err);
     return errorResponse(res, "Failed to retrieve users");
@@ -32,7 +35,7 @@ exports.updateUser = async (req, res) => {
   try {
     const { id } = req.params;
     const updates = req.body;
-    
+
     // Prevent role escalation from non-superadmins
     if (updates.role && req.admin.role !== 'superadmin') {
       return res.status(403).json({

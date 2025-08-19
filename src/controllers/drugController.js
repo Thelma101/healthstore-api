@@ -1,4 +1,5 @@
 const Drug = require('../models/drugModel');
+const { cloudinary } = require('../config/cloudinary');
 const {
   successResponse,
   createdResponse,
@@ -11,7 +12,7 @@ const {
   errorResponse
 } = require('../utils/apiResponse');
 
-// Helper function for filtering, sorting, limiting fields, and pagination
+
 const apiFeatures = async (req, query) => {
   // 1) Filtering
   const queryObj = { ...req.query };
@@ -50,9 +51,30 @@ const apiFeatures = async (req, query) => {
   return query;
 };
 
+// IMAGE MANAGEMENT FUNCTIONS
+const processImages = (images = []) => {
+  if (!Array.isArray(images)) {
+    throw new Error('Images must be an array');
+  }
+
+  const processedImages = images.map(img => ({
+    url: img.url,
+    caption: img.caption || '',
+    isPrimary: img.isPrimary || false
+  }));
+
+  // Validate only one primary image
+  const primaryCount = processedImages.filter(img => img.isPrimary).length;
+  if (primaryCount > 1) {
+    throw new Error('Only one image can be marked as primary');
+  }
+
+  return processedImages;
+};
+
+// DRUG CRUD OPERATIONS
 exports.getAllDrugs = async (req, res) => {
   try {
-    // Execute query
     const features = await apiFeatures(req, Drug.find());
     const drugs = await features;
 
@@ -81,8 +103,145 @@ exports.getDrug = async (req, res) => {
   }
 };
 
-// Add these new methods to your existing controller
+exports.createDrug = async (req, res) => {
+  try {
+    const { images, ...drugData } = req.body;
 
+    // Check for existing drug
+    const existingDrug = await Drug.findOne({ name: drugData.name });
+    if (existingDrug) {
+      return conflictResponse(res, 'Drug with this name already exists', [
+        { field: 'name', message: 'Drug name must be unique' }
+      ]);
+    }
+
+    // Process images if provided
+    let processedImages = [];
+    if (images) {
+      processedImages = processImages(images);
+    }
+
+    const newDrug = await Drug.create({
+      ...drugData,
+      images: processedImages
+    });
+
+    return createdResponse(res, newDrug, 'Drug created successfully');
+
+  } catch (err) {
+    if (err.name === 'ValidationError') {
+      const errors = Object.values(err.errors).map(e => ({
+        field: e.path,
+        message: e.message
+      }));
+      return validationErrorResponse(res, errors);
+    }
+
+    if (err.code === 11000) {
+      return conflictResponse(res, 'Drug name already exists', [
+        { field: 'name', message: 'Drug name must be unique' }
+      ]);
+    }
+
+    if (err.message.includes('Images must be an array') || 
+        err.message.includes('Only one image can be marked as primary')) {
+      return badRequestResponse(res, err.message);
+    }
+
+    return errorResponse(res, 'Failed to create drug: ' + err.message);
+  }
+};
+
+exports.updateDrug = async (req, res) => {
+  try {
+    const { images, ...updateData } = req.body;
+    const { id } = req.params;
+
+    // Check if drug exists
+    const drug = await Drug.findById(id);
+    if (!drug) {
+      return notFoundResponse(res, 'Drug not found');
+    }
+
+    // Check for name conflict
+    if (updateData.name && updateData.name !== drug.name) {
+      const existingDrug = await Drug.findOne({ name: updateData.name });
+      if (existingDrug) {
+        return conflictResponse(res, 'Drug with this name already exists', [
+          { field: 'name', message: 'Drug name must be unique' }
+        ]);
+      }
+    }
+
+    // Process images if provided
+    if (images) {
+      updateData.images = processImages(images);
+    }
+
+    const updatedDrug = await Drug.findByIdAndUpdate(
+      id,
+      {
+        ...updateData,
+        updatedAt: Date.now()
+      },
+      {
+        new: true,
+        runValidators: true
+      }
+    );
+
+    return successResponse(res, updatedDrug, 'Drug updated successfully');
+
+  } catch (err) {
+    if (err.name === 'ValidationError') {
+      const errors = Object.values(err.errors).map(e => ({
+        field: e.path,
+        message: e.message
+      }));
+      return validationErrorResponse(res, errors);
+    }
+
+    if (err.code === 11000) {
+      return conflictResponse(res, 'Drug name already exists', [
+        { field: 'name', message: 'Drug name must be unique' }
+      ]);
+    }
+
+    if (err.message.includes('Images must be an array') || 
+        err.message.includes('Only one image can be marked as primary')) {
+      return badRequestResponse(res, err.message);
+    }
+
+    return errorResponse(res, 'Failed to update drug: ' + err.message);
+  }
+};
+
+exports.deleteDrug = async (req, res) => {
+  try {
+    const drug = await Drug.findById(req.params.id);
+    
+    if (!drug) {
+      return notFoundResponse(res, 'Drug not found');
+    }
+
+    // Delete all associated images from Cloudinary
+    if (drug.images && drug.images.length > 0) {
+      for (const image of drug.images) {
+        await deleteImageFromCloudinary(image.url);
+      }
+    }
+
+    // Delete the drug document
+    await Drug.findByIdAndDelete(req.params.id);
+
+    return noContentResponse(res);
+
+  } catch (err) {
+    return errorResponse(res, 'Failed to delete drug: ' + err.message);
+  }
+};
+
+// IMAGE-SPECIFIC ENDPOINTS
 exports.uploadDrugImages = async (req, res) => {
   try {
     const { id } = req.params;
@@ -97,14 +256,9 @@ exports.uploadDrugImages = async (req, res) => {
       return notFoundResponse(res, 'Drug not found');
     }
 
-    // Process new images
-    const newImages = images.map(img => ({
-      url: img.url,
-      caption: img.caption || '',
-      isPrimary: img.isPrimary || false
-    }));
+    const newImages = processImages(images);
 
-    // If any image is marked as primary, unset others as primary
+    // If any new image is primary, unset existing primary
     if (newImages.some(img => img.isPrimary)) {
       drug.images.forEach(img => { img.isPrimary = false; });
     }
@@ -113,7 +267,69 @@ exports.uploadDrugImages = async (req, res) => {
     await drug.save();
 
     return successResponse(res, drug, 'Images uploaded successfully');
+
   } catch (err) {
+    if (err.message.includes('Images must be an array') || 
+        err.message.includes('Only one image can be marked as primary')) {
+      return badRequestResponse(res, err.message);
+    }
+    return errorResponse(res, 'Failed to upload images: ' + err.message);
+  }
+};
+
+// NEW: Direct file upload to Cloudinary
+exports.uploadDrugImagesDirect = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const files = req.files;
+    const { captions = [], isPrimary } = req.body;
+
+    if (!files || files.length === 0) {
+      return badRequestResponse(res, 'No files uploaded');
+    }
+
+    const drug = await Drug.findById(id);
+    if (!drug) {
+      // Clean up uploaded files if drug doesn't exist
+      for (const file of files) {
+        await deleteImageFromCloudinary(file.path);
+      }
+      return notFoundResponse(res, 'Drug not found');
+    }
+
+    // Process captions (can be string or array)
+    const captionArray = Array.isArray(captions) ? captions : 
+                        typeof captions === 'string' ? captions.split(',') : [];
+
+    const newImages = files.map((file, index) => ({
+      url: file.path, // Cloudinary URL
+      caption: captionArray[index] || '',
+      isPrimary: isPrimary === file.filename || 
+                (typeof isPrimary === 'string' && isPrimary.includes(file.filename))
+    }));
+
+    // If any new image is primary, unset existing primary
+    if (newImages.some(img => img.isPrimary)) {
+      drug.images.forEach(img => { img.isPrimary = false; });
+    }
+
+    drug.images.push(...newImages);
+    await drug.save();
+
+    return successResponse(res, drug, 'Images uploaded successfully');
+
+  } catch (err) {
+    // Clean up any uploaded files on error
+    if (req.files) {
+      for (const file of req.files) {
+        await deleteImageFromCloudinary(file.path);
+      }
+    }
+    
+    if (err.message.includes('Images must be an array') || 
+        err.message.includes('Only one image can be marked as primary')) {
+      return badRequestResponse(res, err.message);
+    }
     return errorResponse(res, 'Failed to upload images: ' + err.message);
   }
 };
@@ -127,7 +343,6 @@ exports.setPrimaryImage = async (req, res) => {
       return notFoundResponse(res, 'Drug not found');
     }
 
-    // Find the image to set as primary
     const imageToSet = drug.images.id(imageId);
     if (!imageToSet) {
       return notFoundResponse(res, 'Image not found');
@@ -141,6 +356,7 @@ exports.setPrimaryImage = async (req, res) => {
     await drug.save();
 
     return successResponse(res, drug, 'Primary image set successfully');
+
   } catch (err) {
     return errorResponse(res, 'Failed to set primary image: ' + err.message);
   }
@@ -155,140 +371,130 @@ exports.deleteImage = async (req, res) => {
       return notFoundResponse(res, 'Drug not found');
     }
 
-    // Remove the image
+    const imageToDelete = drug.images.id(imageId);
+    if (!imageToDelete) {
+      return notFoundResponse(res, 'Image not found');
+    }
+
+    // Delete from Cloudinary
+    await deleteImageFromCloudinary(imageToDelete.url);
+
     drug.images.pull(imageId);
     await drug.save();
 
     return successResponse(res, drug, 'Image deleted successfully');
+
   } catch (err) {
     return errorResponse(res, 'Failed to delete image: ' + err.message);
   }
 };
 
-// Update your createDrug and updateDrug methods to handle images
-exports.createDrug = async (req, res) => {
+// BULK IMAGE OPERATIONS
+exports.bulkDeleteImages = async (req, res) => {
   try {
-    const { images = [], ...drugData } = req.body;
-
-    // Check for existing drug
-    const existingDrug = await Drug.findOne({ name: drugData.name });
-    if (existingDrug) {
-      return conflictResponse(res, 'Drug with this name already exists');
-    }
-
-    // Process images if provided
-    const processedImages = images.map(img => ({
-      url: img.url,
-      caption: img.caption || '',
-      isPrimary: img.isPrimary || false
-    }));
-
-    // Ensure only one primary image
-    if (processedImages.filter(img => img.isPrimary).length > 1) {
-      return badRequestResponse(res, 'Only one image can be primary');
-    }
-
-    const newDrug = await Drug.create({
-      ...drugData,
-      images: processedImages
-    });
-
-    return createdResponse(res, newDrug, 'Drug created successfully');
-  } catch (err) {
-    // ... existing error handling ...
-  }
-};
-
-exports.updateDrug = async (req, res) => {
-  try {
-    const { images, ...updateData } = req.body;
     const { id } = req.params;
+    const { imageIds } = req.body;
 
-    // ... existing update logic ...
-
-    if (images) {
-      const processedImages = images.map(img => ({
-        url: img.url,
-        caption: img.caption || '',
-        isPrimary: img.isPrimary || false
-      }));
-
-      // Ensure only one primary image
-      if (processedImages.filter(img => img.isPrimary).length > 1) {
-        return badRequestResponse(res, 'Only one image can be primary');
-      }
-
-      updateData.images = processedImages;
+    if (!imageIds || !Array.isArray(imageIds)) {
+      return badRequestResponse(res, 'Image IDs array is required');
     }
 
-    const updatedDrug = await Drug.findByIdAndUpdate(
-      id,
-      updateData,
-      { new: true, runValidators: true }
+    const drug = await Drug.findById(id);
+    if (!drug) {
+      return notFoundResponse(res, 'Drug not found');
+    }
+
+    // Find images to delete
+    const imagesToDelete = drug.images.filter(img => 
+      imageIds.includes(img._id.toString())
     );
 
-    return successResponse(res, updatedDrug, 'Drug updated successfully');
+    // Delete from Cloudinary
+    for (const image of imagesToDelete) {
+      await deleteImageFromCloudinary(image.url);
+    }
+
+    // Remove from database
+    drug.images = drug.images.filter(img => 
+      !imageIds.includes(img._id.toString())
+    );
+
+    await drug.save();
+
+    return successResponse(res, drug, 'Images deleted successfully');
+
   } catch (err) {
-    // ... existing error handling ...
+    return errorResponse(res, 'Failed to delete images: ' + err.message);
   }
 };
 
-exports.createDrug = async (req, res) => {
+// SEARCH AND INVENTORY MANAGEMENT
+exports.searchDrugs = async (req, res) => {
   try {
-    const {
-      name,
-      description,
-      category,
-      price,
-      quantity,
-      dosage,
-      prescriptionRequired,
-      sideEffects,
-      manufacturer,
-      expiryDate
-    } = req.body;
+    const { query } = req.query;
 
-    
-    const existingDrug = await Drug.findOne({ name });
-    if (existingDrug) {
-      return conflictResponse(res, 'Drug with this name already exists', [
-        { field: 'name', message: 'Drug name must be unique' }
-      ]);
+    if (!query) {
+      return badRequestResponse(res, 'Search query is required');
     }
 
-    const newDrug = await Drug.create({
-      name,
-      description,
-      category,
-      price,
-      quantity,
-      dosage,
-      prescriptionRequired,
-      sideEffects,
-      manufacturer,
-      expiryDate
+    const drugs = await Drug.find({
+      $text: { $search: query }
+    }).select('name description category price images');
+
+    return successResponse(res, {
+      results: drugs.length,
+      data: drugs
     });
 
-    return createdResponse(res, newDrug, 'Drug created successfully');
-
   } catch (err) {
-    // Handle validation errors
-    if (err.name === 'ValidationError') {
-      const errors = Object.values(err.errors).map(e => ({
-        field: e.path,
-        message: e.message
-      }));
-      return validationErrorResponse(res, errors);
-    }
-
-    // Handle duplicate name error
-    if (err.code === 11000) {
-      return conflictResponse(res, 'Drug name already exists', [
-        { field: 'name', message: 'Drug name must be unique' }
-      ]);
-    }
-
-    return errorResponse(res, 'Failed to create drug: ' + err.message);
+    return errorResponse(res, 'Search failed: ' + err.message);
   }
 };
 
+exports.getDrugsByCategory = async (req, res) => {
+  try {
+    const { category } = req.params;
+
+    const drugs = await Drug.find({ category });
+
+    return successResponse(res, {
+      results: drugs.length,
+      data: drugs
+    });
+
+  } catch (err) {
+    return errorResponse(res, 'Failed to fetch drugs by category: ' + err.message);
+  }
+};
+
+exports.checkLowStock = async (req, res) => {
+  try {
+    const lowStockDrugs = await Drug.find({
+      quantity: { $lte: 10 }
+    }).select('name quantity images');
+
+    return successResponse(res, {
+      results: lowStockDrugs.length,
+      data: lowStockDrugs
+    });
+
+  } catch (err) {
+    return errorResponse(res, 'Failed to check low stock: ' + err.message);
+  }
+};
+
+exports.checkExpiredDrugs = async (req, res) => {
+  try {
+    const expiredDrugs = await Drug.find({
+      expiryDate: { $lt: new Date() }
+    }).select('name expiryDate quantity images');
+
+    return successResponse(res, {
+      results: expiredDrugs.length,
+      data: expiredDrugs
+    });
+
+  } catch (err) {
+    return errorResponse(res, 'Failed to check expired drugs: ' + err.message);
+  }
+};

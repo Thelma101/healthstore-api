@@ -1,19 +1,23 @@
 const mongoose = require('mongoose');
 const slugify = require('slugify');
 
+
 const categorySchema = new mongoose.Schema({
   name: {
     type: String,
-    required: [true, 'A category must have a name'],
+    required: [true, 'Category name is required'],
     unique: true,
     trim: true,
-    maxlength: [50, 'Category name cannot exceed 50 characters'],
-    minlength: [3, 'Category name must have at least 3 characters']
+    maxlength: [50, 'Category name cannot exceed 50 characters']
   },
-  slug: String,
   description: {
     type: String,
     trim: true
+  },
+  slug: String,
+  isActive: {
+    type: Boolean,
+    default: true
   },
   parentCategory: {
     type: mongoose.Schema.Types.ObjectId,
@@ -21,27 +25,11 @@ const categorySchema = new mongoose.Schema({
     default: null
   },
   image: String,
-  isActive: {
-    type: Boolean,
-    default: true
-  },
-  featured: {
-    type: Boolean,
-    default: false
-  },
-  metaTitle: String,
-  metaDescription: String,
-  displayOrder: {
-    type: Number,
-    default: 0
-  },
-  createdBy: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
-  },
-  updatedBy: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
+  meta: {
+    drugCount: {
+      type: Number,
+      default: 0
+    }
   }
 }, {
   timestamps: true,
@@ -49,22 +37,23 @@ const categorySchema = new mongoose.Schema({
   toObject: { virtuals: true }
 });
 
+// Add slug generation middleware
+categorySchema.pre('save', function (next) {
+  this.slug = slugify(this.name, { lower: true });
+  next();
+});
+
+
 // Indexes
 categorySchema.index({ slug: 1 });
 categorySchema.index({ name: 'text', description: 'text' });
 
 // Document middleware
-categorySchema.pre('save', function(next) {
+categorySchema.pre('save', function (next) {
   this.slug = slugify(this.name, { lower: true });
   next();
 });
 
-// Virtual populate
-categorySchema.virtual('subCategories', {
-  ref: 'Category',
-  foreignField: 'parentCategory',
-  localField: '_id'
-});
 
 categorySchema.virtual('drugCount', {
   ref: 'Drug',

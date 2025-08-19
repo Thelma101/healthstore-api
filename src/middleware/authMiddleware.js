@@ -43,4 +43,5 @@ exports.restrictTo = (...roles) => {
   };
 };
 
-exports.admin = exports.restrictTo('admin');
+// exports.admin = exports.restrictTo('admin');
+
