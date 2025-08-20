@@ -76,8 +76,16 @@ cartSchema.virtual('total').get(function() {
   return subtotal - discount;
 });
 
-cartSchema.virtual('formattedTotal').get(function() {
-  return this.totalAmount ? `₦${this.totalAmount.toLocaleString()}` : '₦0';
+cartSchema.virtual('FullTotal').get(function() {
+  return this.subtotal ? `₦${this.subtotal.toLocaleString()}` : '₦0';
+});
+
+cartSchema.virtual('totalItems').get(function() {
+  return this.items.reduce((sum, item) => sum + item.quantity, 0);
+});
+
+cartSchema.virtual('totalAmount').get(function() {  
+  return this.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
 });
 
 // Document middleware
@@ -87,12 +95,12 @@ cartSchema.pre('save', function(next) {
 });
 
 // Query middleware
-cartSchema.pre(/^find/, function(next) {
-  this.populate({
-    path: 'items.drug',
-    select: 'name price images requiresPrescription'
-  });
-  next();
-});
+// cartSchema.pre(/^find/, function(next) {
+//   this.populate({
+//     path: 'items.drug',
+//     select: 'name price images requiresPrescription'
+//   });
+//   next();
+// });
 
 module.exports = mongoose.model('Cart', cartSchema);

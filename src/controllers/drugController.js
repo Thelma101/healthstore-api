@@ -22,7 +22,7 @@ const apiFeatures = async (req, query) => {
   // Advanced filtering
   let queryStr = JSON.stringify(queryObj);
   queryStr = queryStr.replace(/\b(gte|gt|lte|lt)\b/g, match => `$${match}`);
-  
+
   query = query.find(JSON.parse(queryStr));
 
   // 2) Sorting
@@ -72,7 +72,6 @@ const processImages = (images = []) => {
   return processedImages;
 };
 
-// DRUG CRUD OPERATIONS
 exports.getAllDrugs = async (req, res) => {
   try {
     const features = await apiFeatures(req, Drug.find());
@@ -107,7 +106,6 @@ exports.createDrug = async (req, res) => {
   try {
     const { images, ...drugData } = req.body;
 
-    // Check for existing drug
     const existingDrug = await Drug.findOne({ name: drugData.name });
     if (existingDrug) {
       return conflictResponse(res, 'Drug with this name already exists', [
@@ -115,7 +113,6 @@ exports.createDrug = async (req, res) => {
       ]);
     }
 
-    // Process images if provided
     let processedImages = [];
     if (images) {
       processedImages = processImages(images);
@@ -143,8 +140,8 @@ exports.createDrug = async (req, res) => {
       ]);
     }
 
-    if (err.message.includes('Images must be an array') || 
-        err.message.includes('Only one image can be marked as primary')) {
+    if (err.message.includes('Images must be an array') ||
+      err.message.includes('Only one image can be marked as primary')) {
       return badRequestResponse(res, err.message);
     }
 
@@ -157,13 +154,11 @@ exports.updateDrug = async (req, res) => {
     const { images, ...updateData } = req.body;
     const { id } = req.params;
 
-    // Check if drug exists
     const drug = await Drug.findById(id);
     if (!drug) {
       return notFoundResponse(res, 'Drug not found');
     }
 
-    // Check for name conflict
     if (updateData.name && updateData.name !== drug.name) {
       const existingDrug = await Drug.findOne({ name: updateData.name });
       if (existingDrug) {
@@ -173,7 +168,6 @@ exports.updateDrug = async (req, res) => {
       }
     }
 
-    // Process images if provided
     if (images) {
       updateData.images = processImages(images);
     }
@@ -207,8 +201,8 @@ exports.updateDrug = async (req, res) => {
       ]);
     }
 
-    if (err.message.includes('Images must be an array') || 
-        err.message.includes('Only one image can be marked as primary')) {
+    if (err.message.includes('Images must be an array') ||
+      err.message.includes('Only one image can be marked as primary')) {
       return badRequestResponse(res, err.message);
     }
 
@@ -219,7 +213,7 @@ exports.updateDrug = async (req, res) => {
 exports.deleteDrug = async (req, res) => {
   try {
     const drug = await Drug.findById(req.params.id);
-    
+
     if (!drug) {
       return notFoundResponse(res, 'Drug not found');
     }
@@ -269,15 +263,15 @@ exports.uploadDrugImages = async (req, res) => {
     return successResponse(res, drug, 'Images uploaded successfully');
 
   } catch (err) {
-    if (err.message.includes('Images must be an array') || 
-        err.message.includes('Only one image can be marked as primary')) {
+    if (err.message.includes('Images must be an array') ||
+      err.message.includes('Only one image can be marked as primary')) {
       return badRequestResponse(res, err.message);
     }
     return errorResponse(res, 'Failed to upload images: ' + err.message);
   }
 };
 
-// NEW: Direct file upload to Cloudinary
+// file upload to Cloudinary
 exports.uploadDrugImagesDirect = async (req, res) => {
   try {
     const { id } = req.params;
@@ -297,15 +291,14 @@ exports.uploadDrugImagesDirect = async (req, res) => {
       return notFoundResponse(res, 'Drug not found');
     }
 
-    // Process captions (can be string or array)
-    const captionArray = Array.isArray(captions) ? captions : 
-                        typeof captions === 'string' ? captions.split(',') : [];
+    const captionArray = Array.isArray(captions) ? captions :
+      typeof captions === 'string' ? captions.split(',') : [];
 
     const newImages = files.map((file, index) => ({
-      url: file.path, // Cloudinary URL
+      url: file.path,
       caption: captionArray[index] || '',
-      isPrimary: isPrimary === file.filename || 
-                (typeof isPrimary === 'string' && isPrimary.includes(file.filename))
+      isPrimary: isPrimary === file.filename ||
+        (typeof isPrimary === 'string' && isPrimary.includes(file.filename))
     }));
 
     // If any new image is primary, unset existing primary
@@ -325,9 +318,9 @@ exports.uploadDrugImagesDirect = async (req, res) => {
         await deleteImageFromCloudinary(file.path);
       }
     }
-    
-    if (err.message.includes('Images must be an array') || 
-        err.message.includes('Only one image can be marked as primary')) {
+
+    if (err.message.includes('Images must be an array') ||
+      err.message.includes('Only one image can be marked as primary')) {
       return badRequestResponse(res, err.message);
     }
     return errorResponse(res, 'Failed to upload images: ' + err.message);
@@ -376,7 +369,6 @@ exports.deleteImage = async (req, res) => {
       return notFoundResponse(res, 'Image not found');
     }
 
-    // Delete from Cloudinary
     await deleteImageFromCloudinary(imageToDelete.url);
 
     drug.images.pull(imageId);
@@ -404,18 +396,15 @@ exports.bulkDeleteImages = async (req, res) => {
       return notFoundResponse(res, 'Drug not found');
     }
 
-    // Find images to delete
-    const imagesToDelete = drug.images.filter(img => 
+    const imagesToDelete = drug.images.filter(img =>
       imageIds.includes(img._id.toString())
     );
 
-    // Delete from Cloudinary
     for (const image of imagesToDelete) {
       await deleteImageFromCloudinary(image.url);
     }
 
-    // Remove from database
-    drug.images = drug.images.filter(img => 
+    drug.images = drug.images.filter(img =>
       !imageIds.includes(img._id.toString())
     );
 
@@ -443,6 +432,7 @@ exports.searchDrugs = async (req, res) => {
 
     return successResponse(res, {
       results: drugs.length,
+      // quantity,
       data: drugs
     });
 

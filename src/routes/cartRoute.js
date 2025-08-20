@@ -11,8 +11,8 @@ router.use(authMiddleware.protect);
 router.get('/', cartController.getCart);
 router.get('/summary', cartController.getCartSummary);
 router.post('/items', cartController.addToCart);
-router.patch('/items/:itemId', cartController.updateCartItem);
-router.delete('/items/:itemId', cartController.removeFromCart);
+router.patch('/items/:cartItemId', cartController.updateCartItem);
+router.delete('/items/:cartItemId', cartController.removeFromCart);
 router.delete('/clear', cartController.clearCart);
 
 module.exports = router;

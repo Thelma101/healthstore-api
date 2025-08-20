@@ -14,32 +14,60 @@ const {
 exports.getCart = async (req, res) => {
     try {
         const cart = await Cart.findOne({ user: req.user._id })
-            .populate({
-                path: 'user',
-                select: 'firstName lastName email phone'
-            })
-            .populate({
-                path: 'items.drug',
-                select: 'name price images prescriptionRequired category manufacturer dosage'
-            });
+            .populate('user', 'firstName lastName email phone')
+            .populate('items.drug', 'name price category images prescriptionRequired');
 
         if (!cart) {
-            const newCart = await Cart.create({
-                user: req.user._id,
+            return successResponse(res, {
+                cartId: null,
+                user: { 
+                    userId: req.user._id, 
+                    fullName: `${req.user.firstName} ${req.user.lastName}` 
+                },
                 items: [],
-                totalAmount: 0,
-                totalItems: 0
-            });
-
-            await newCart.populate([
-                { path: 'user', select: 'firstName lastName email phone' },
-                { path: 'items.drug', select: 'name price images prescriptionRequired category' }
-            ]);
-
-            return successResponse(res, newCart);
+                summary: { 
+                    totalItems: 0, 
+                    subtotal: 0, 
+                    fullTotal: "₦0", 
+                    requiresPrescription: false 
+                },
+                timestamps: { createdAt: null, updatedAt: null }
+            }, 'Cart is empty');
         }
 
-        return successResponse(res, cart);
+        const response = {
+            cartId: cart._id,
+            user: {
+                userId: cart.user._id,
+                fullName: `${cart.user.firstName} ${cart.user.lastName}`,
+                email: cart.user.email,
+                phone: cart.user.phone
+            },
+            items: cart.items.map(item => ({
+                cartItemId: item._id,
+                drugId: item.drug._id,
+                name: item.drug.name,
+                category: item.drug.category,
+                price: item.price,
+                quantity: item.quantity,
+                itemTotal: item.price * item.quantity,
+                prescriptionRequired: item.drug.prescriptionRequired,
+                image: item.drug.images[0]?.url || null,
+                addedAt: item.addedAt
+            })),
+            summary: {
+                totalItems: cart.totalItems,
+                subtotal: cart.totalAmount, // ✅ FIX: Use totalAmount, not subtotal
+                fullTotal: `₦${cart.totalAmount?.toLocaleString() || '0'}`, // ✅ FIX: Use totalAmount
+                requiresPrescription: cart.items.some(item => item.drug.prescriptionRequired)
+            },
+            timestamps: {
+                createdAt: cart.createdAt,
+                updatedAt: cart.updatedAt
+            }
+        };
+
+        return successResponse(res, response, 'Cart retrieved successfully');
     } catch (err) {
         return errorResponse(res, 'Failed to fetch cart: ' + err.message);
     }
@@ -97,9 +125,45 @@ exports.addToCart = async (req, res) => {
         }
 
         await cart.save();
-        await cart.populate('items.drug', 'name price images prescriptionRequired');
+        // await cart.populate('items.drug', 'name price images prescriptionRequired');
+        const populatedCart = await Cart.findById(cart._id)
+            .populate('user', 'firstName lastName email phone')
+            .populate('items.drug', 'name price category images prescriptionRequired');
 
-        return successResponse(res, cart, 'Item added to cart successfully');
+        const response = {
+            cartId: populatedCart._id,
+            user: {
+                userId: populatedCart.user._id,
+                fullName: `${populatedCart.user.firstName} ${populatedCart.user.lastName}`,
+                email: populatedCart.user.email,
+                phone: populatedCart.user.phone
+            },
+            items: populatedCart.items.map(item => ({
+                cartItemId: item._id,
+                drugId: item.drug._id,
+                name: item.drug.name,
+                category: item.drug.category,
+                price: item.price,
+                quantity: item.quantity,
+                itemTotal: item.price * item.quantity,
+                prescriptionRequired: item.drug.prescriptionRequired,
+                image: item.drug.images[0]?.url || null,
+                addedAt: item.addedAt
+            })),
+            summary: {
+                totalItems: populatedCart.totalItems,
+                subtotal: populatedCart.totalAmount, // ✅ FIX: Use totalAmount
+                fullTotal: `₦${populatedCart.totalAmount?.toLocaleString() || '0'}`, // ✅ FIX: Use totalAmount
+                requiresPrescription: populatedCart.items.some(item => item.drug.prescriptionRequired)
+            },
+            timestamps: {
+                createdAt: populatedCart.createdAt,
+                updatedAt: populatedCart.updatedAt
+            }
+        };
+
+        return successResponse(res, response, 'Item added to cart successfully');
+
     } catch (err) {
         return errorResponse(res, 'Failed to add item to cart: ' + err.message);
     }
@@ -108,8 +172,15 @@ exports.addToCart = async (req, res) => {
 
 exports.updateCartItem = async (req, res) => {
     try {
-        const { itemId } = req.params;
+        const { cartItemId } = req.params; // Changed from itemId to cartItemId
         const { quantity } = req.body;
+
+        // Check if cartItemId is provided
+        if (!cartItemId || cartItemId === 'undefined') {
+            return badRequestResponse(res, 'Cart Item ID is required in the URL parameters');
+        }
+
+        console.log('Updating cart item:', { cartItemId, quantity, userId: req.user._id });
 
         if (quantity === undefined || quantity === null) {
             return badRequestResponse(res, 'Quantity is required');
@@ -119,31 +190,79 @@ exports.updateCartItem = async (req, res) => {
             return badRequestResponse(res, 'Quantity must be between 1 and 10');
         }
 
-        const cart = await Cart.findOne({ user: req.user._id });
+        // First find the cart with populated items
+        const cart = await Cart.findOne({ user: req.user._id })
+            .populate('items.drug', 'quantity');
+
         if (!cart) {
             return notFoundResponse(res, 'Cart not found');
         }
 
-        const itemIndex = cart.items.findIndex(
-            item => item._id.toString() === itemId
-        );
+        console.log('Cart items:', cart.items.map(item => ({ 
+            cartItemId: item._id.toString(), 
+            drugId: item.drug?._id.toString() 
+        })));
 
-        if (itemIndex === -1) {
+        // Find the item in the cart
+        const cartItem = cart.items.find(item => item._id.toString() === cartItemId);
+        
+        if (!cartItem) {
+            console.log('Item not found. Looking for:', cartItemId);
             return notFoundResponse(res, 'Item not found in cart');
         }
 
         // Check stock availability
-        const drug = await Drug.findById(cart.items[itemIndex].drug);
-        if (drug.quantity < quantity) {
-            return badRequestResponse(res, `Only ${drug.quantity} items available in stock`);
+        if (cartItem.drug.quantity < quantity) {
+            return badRequestResponse(res, `Only ${cartItem.drug.quantity} items available in stock`);
         }
 
+        // Update the cart item using array position
+        const itemIndex = cart.items.findIndex(item => item._id.toString() === cartItemId);
         cart.items[itemIndex].quantity = quantity;
+        
+        // Recalculate totals
         await cart.save();
-        await cart.populate('items.drug', 'name price images prescriptionRequired');
 
-        return successResponse(res, cart, 'Cart item updated successfully');
+        // Populate the updated cart for response
+        const populatedCart = await Cart.findById(cart._id)
+            .populate('user', 'firstName lastName email phone')
+            .populate('items.drug', 'name price category images prescriptionRequired');
+
+        const response = {
+            cartId: populatedCart._id,
+            user: {
+                userId: populatedCart.user._id,
+                fullName: `${populatedCart.user.firstName} ${populatedCart.user.lastName}`,
+                email: populatedCart.user.email,
+                phone: populatedCart.user.phone
+            },
+            items: populatedCart.items.map(item => ({
+                cartItemId: item._id,
+                drugId: item.drug._id,
+                name: item.drug.name,
+                category: item.drug.category,
+                price: item.price,
+                quantity: item.quantity,
+                itemTotal: item.price * item.quantity,
+                prescriptionRequired: item.drug.prescriptionRequired,
+                image: item.drug.images[0]?.url || null,
+                addedAt: item.addedAt
+            })),
+            summary: {
+                totalItems: populatedCart.totalItems,
+                subtotal: populatedCart.totalAmount,
+                fullTotal: `₦${populatedCart.totalAmount?.toLocaleString() || '0'}`,
+                requiresPrescription: populatedCart.items.some(item => item.drug.prescriptionRequired)
+            },
+            timestamps: {
+                createdAt: populatedCart.createdAt,
+                updatedAt: populatedCart.updatedAt
+            }
+        };
+
+        return successResponse(res, response, 'Cart item updated successfully');
     } catch (err) {
+        console.error('Error updating cart item:', err);
         return errorResponse(res, 'Failed to update cart item: ' + err.message);
     }
 };

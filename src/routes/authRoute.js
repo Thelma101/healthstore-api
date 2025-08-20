@@ -2,7 +2,6 @@ const express = require('express');
 const router = express.Router();
 const authController = require('../controllers/authController');
 const verificationController = require('../controllers/verificationController');
-const viewController = require('../controllers/viewController');
 
 // Public routes
 router.post('/register', authController.signup);
