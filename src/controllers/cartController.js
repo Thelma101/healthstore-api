@@ -172,10 +172,9 @@ exports.addToCart = async (req, res) => {
 
 exports.updateCartItem = async (req, res) => {
     try {
-        const { cartItemId } = req.params; // Changed from itemId to cartItemId
+        const { cartItemId } = req.params;
         const { quantity } = req.body;
 
-        // Check if cartItemId is provided
         if (!cartItemId || cartItemId === 'undefined') {
             return badRequestResponse(res, 'Cart Item ID is required in the URL parameters');
         }
@@ -269,7 +268,7 @@ exports.updateCartItem = async (req, res) => {
 
 exports.removeFromCart = async (req, res) => {
     try {
-        const { itemId } = req.params;
+        const { cartItemId } = req.params;
 
         const cart = await Cart.findOne({ user: req.user._id });
         if (!cart) {
@@ -277,7 +276,7 @@ exports.removeFromCart = async (req, res) => {
         }
 
         const itemIndex = cart.items.findIndex(
-            item => item._id.toString() === itemId
+            item => item._id.toString() === cartItemId
         );
 
         if (itemIndex === -1) {
