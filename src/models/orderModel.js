@@ -4,159 +4,96 @@ const orderItemSchema = new mongoose.Schema({
   drug: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Drug',
-    required: [true, 'An order item must reference a drug']
-  },
-  name: {
-    type: String,
-    required: [true, 'An order item must have a name']
+    required: true
   },
   quantity: {
     type: Number,
-    required: [true, 'An order item must have a quantity'],
-    min: [1, 'Quantity must be at least 1']
+    required: true,
+    min: 1
   },
   price: {
     type: Number,
-    required: [true, 'An order item must have a price']
+    required: true
   },
-  image: String,
-  requiresPrescription: {
+  name: {
+    type: String,
+    required: true
+  },
+  prescriptionRequired: {
     type: Boolean,
-    default: false
-  },
-  prescription: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Prescription'
+    default: true
   }
 });
 
 const orderSchema = new mongoose.Schema({
+  orderNumber: {
+    type: String,
+    unique: true,
+    required: true
+  },
   user: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: [true, 'An order must belong to a user']
+    required: true
   },
   items: [orderItemSchema],
-  shippingAddress: {
-    type: {
-      street: String,
-      city: String,
-      state: String,
-      zipCode: String,
-      country: String,
-      coordinates: [Number]
-    },
-    required: [true, 'An order must have a shipping address']
-  },
-  paymentMethod: {
-    type: String,
-    enum: ['card', 'bank-transfer', 'cash-on-delivery', 'wallet'],
-    required: [true, 'An order must have a payment method']
-  },
-  paymentResult: {
-    id: String,
-    status: String,
-    update_time: String,
-    email_address: String
-  },
-  taxPrice: {
+  totalAmount: {
     type: Number,
     required: true,
-    default: 0.0
-  },
-  shippingPrice: {
-    type: Number,
-    required: true,
-    default: 0.0
-  },
-  couponDiscount: {
-    type: Number,
-    default: 0.0
-  },
-  totalPrice: {
-    type: Number,
-    required: true,
-    default: 0.0
-  },
-  isPaid: {
-    type: Boolean,
-    required: true,
-    default: false
-  },
-  paidAt: {
-    type: Date
-  },
-  isDelivered: {
-    type: Boolean,
-    required: true,
-    default: false
-  },
-  deliveredAt: {
-    type: Date
+    min: 0
   },
   status: {
     type: String,
-    enum: ['pending', 'processing', 'shipped', 'delivered', 'cancelled', 'refunded'],
+    enum: ['pending', 'approved', 'rejected', 'completed', 'cancelled'],
     default: 'pending'
   },
-  trackingNumber: String,
-  carrier: String,
+  shippingAddress: {
+    street: String,
+    city: String,
+    state: String,
+    country: String,
+    postalCode: String
+  },
+  contactInfo: {
+    phone: String,
+    email: String
+  },
+  paymentMethod: {
+    type: String,
+    enum: ['card', 'bank_transfer', 'cash_on_delivery'],
+    default: 'card'
+  },
+  paymentStatus: {
+    type: String,
+    enum: ['pending', 'paid', 'failed', 'refunded'],
+    default: 'pending'
+  },
   notes: String,
-  prescriptionRequired: {
-    type: Boolean,
-    default: false
-  },
-  prescriptionVerified: {
-    type: Boolean,
-    default: false
-  },
-  verifiedBy: {
+  prescription: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
+    ref: 'Prescription'
   }
 }, {
-  timestamps: true,
-  toJSON: { virtuals: true },
-  toObject: { virtuals: true }
+  timestamps: true
 });
 
-// Indexes
-orderSchema.index({ user: 1 });
-orderSchema.index({ createdAt: -1 });
-orderSchema.index({ status: 1 });
-
-// Document middleware
-orderSchema.pre('save', async function(next) {
-  if (this.isModified('items')) {
-    // Check if any item requires prescription
-    const drugs = await this.model('Drug').find({
-      _id: { $in: this.items.map(item => item.drug) }
-    });
-    
-    this.prescriptionRequired = drugs.some(drug => drug.requiresPrescription);
+// Generate order number
+orderSchema.pre('validate', async function(next) {
+  if (this.isNew && !this.orderNumber) {
+    const count = await mongoose.model('Order').countDocuments();
+    this.orderNumber = `ORD-${Date.now()}-${count + 1}`;
   }
   next();
 });
 
-// Query middleware
-orderSchema.pre(/^find/, function(next) {
-  this.populate({
-    path: 'user',
-    select: 'firstName lastName email phone'
-  }).populate({
-    path: 'items.drug',
-    select: 'name genericName images'
-  });
-  next();
+// Virtual for formatted order status
+orderSchema.virtual('statusFormatted').get(function() {
+  return this.status.charAt(0).toUpperCase() + this.status.slice(1);
 });
 
-// Virtuals
-orderSchema.virtual('orderNumber').get(function() {
-  return `ORD-${this._id.toString().substring(18, 24).toUpperCase()}`;
-});
-
-orderSchema.virtual('itemCount').get(function() {
-  return this.items.reduce((sum, item) => sum + item.quantity, 0);
+// Virtual for formatted total amount
+orderSchema.virtual('totalAmountFormatted').get(function() {
+  return `₦${this.totalAmount?.toLocaleString() || '0'}`;
 });
 
 module.exports = mongoose.model('Order', orderSchema);

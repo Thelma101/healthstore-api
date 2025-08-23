@@ -171,14 +171,14 @@ const drugSchema = new mongoose.Schema({
   category: {
     type: String,
     required: [true, 'Category is required'],
-    enum: [
-      'antibiotics',
-      'analgesics',
-      'antivirals',
-      'antidepressants',
-      'vaccines',
-      'other'
-    ]
+    // enum: [
+    //   'antibiotics',
+    //   'analgesics',
+    //   'antivirals',
+    //   'antidepressants',
+    //   'vaccines',
+    //   'other'
+    // ]
   },
   price: {
     type: Number,
@@ -194,9 +194,17 @@ const drugSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Dosage is required']
   },
-  prescriptionRequired: {
+  // prescriptionRequired: {
+  //   type: Boolean,
+  //   default: true
+  // },
+  hasUploadedPrescription: {
     type: Boolean,
-    default: true
+    default: false
+  },
+  prescription: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Prescription'
   },
   sideEffects: [String],
   manufacturer: {
@@ -232,8 +240,6 @@ drugSchema.pre('findOneAndUpdate', function (next) {
   this.set({ updatedAt: new Date() });
   next();
 });
-
-// module.exports = mongoose.model('Drug', drugSchema);
 
 
 drugSchema.index({ price: 1, ratingsAverage: -1 });

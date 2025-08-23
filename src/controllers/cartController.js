@@ -175,11 +175,9 @@ exports.updateCartItem = async (req, res) => {
         const { cartItemId } = req.params;
         const { quantity } = req.body;
 
-        if (!cartItemId || cartItemId === 'undefined') {
-            return badRequestResponse(res, 'Cart Item ID is required in the URL parameters');
+        if (!cartItemId) {
+            return badRequestResponse(res, 'Cart Item ID is required');
         }
-
-        console.log('Updating cart item:', { cartItemId, quantity, userId: req.user._id });
 
         if (quantity === undefined || quantity === null) {
             return badRequestResponse(res, 'Quantity is required');
@@ -189,7 +187,6 @@ exports.updateCartItem = async (req, res) => {
             return badRequestResponse(res, 'Quantity must be between 1 and 10');
         }
 
-        // First find the cart with populated items
         const cart = await Cart.findOne({ user: req.user._id })
             .populate('items.drug', 'quantity');
 
@@ -197,32 +194,21 @@ exports.updateCartItem = async (req, res) => {
             return notFoundResponse(res, 'Cart not found');
         }
 
-        console.log('Cart items:', cart.items.map(item => ({ 
-            cartItemId: item._id.toString(), 
-            drugId: item.drug?._id.toString() 
-        })));
-
-        // Find the item in the cart
         const cartItem = cart.items.find(item => item._id.toString() === cartItemId);
         
         if (!cartItem) {
-            console.log('Item not found. Looking for:', cartItemId);
             return notFoundResponse(res, 'Item not found in cart');
         }
 
-        // Check stock availability
         if (cartItem.drug.quantity < quantity) {
             return badRequestResponse(res, `Only ${cartItem.drug.quantity} items available in stock`);
         }
 
-        // Update the cart item using array position
         const itemIndex = cart.items.findIndex(item => item._id.toString() === cartItemId);
         cart.items[itemIndex].quantity = quantity;
         
-        // Recalculate totals
         await cart.save();
 
-        // Populate the updated cart for response
         const populatedCart = await Cart.findById(cart._id)
             .populate('user', 'firstName lastName email phone')
             .populate('items.drug', 'name price category images prescriptionRequired');
@@ -270,25 +256,63 @@ exports.removeFromCart = async (req, res) => {
     try {
         const { cartItemId } = req.params;
 
+        if (!cartItemId) {
+            return badRequestResponse(res, 'Cart Item ID is required');
+        }
+
         const cart = await Cart.findOne({ user: req.user._id });
         if (!cart) {
             return notFoundResponse(res, 'Cart not found');
         }
 
-        const itemIndex = cart.items.findIndex(
-            item => item._id.toString() === cartItemId
-        );
-
-        if (itemIndex === -1) {
+        const initialItemCount = cart.items.length;
+        cart.items = cart.items.filter(item => item._id.toString() !== cartItemId);
+        
+        if (cart.items.length === initialItemCount) {
             return notFoundResponse(res, 'Item not found in cart');
         }
 
-        cart.items.splice(itemIndex, 1);
         await cart.save();
-        await cart.populate('items.drug', 'name price images prescriptionRequired');
 
-        return successResponse(res, cart, 'Item removed from cart successfully');
+        const populatedCart = await Cart.findById(cart._id)
+            .populate('user', 'firstName lastName email phone')
+            .populate('items.drug', 'name price category images prescriptionRequired');
+
+        const response = {
+            cartId: populatedCart._id,
+            user: {
+                userId: populatedCart.user._id,
+                fullName: `${populatedCart.user.firstName} ${populatedCart.user.lastName}`,
+                email: populatedCart.user.email,
+                phone: populatedCart.user.phone
+            },
+            items: populatedCart.items.map(item => ({
+                cartItemId: item._id,
+                drugId: item.drug._id,
+                name: item.drug.name,
+                category: item.drug.category,
+                price: item.price,
+                quantity: item.quantity,
+                itemTotal: item.price * item.quantity,
+                prescriptionRequired: item.drug.prescriptionRequired,
+                image: item.drug.images[0]?.url || null,
+                addedAt: item.addedAt
+            })),
+            summary: {
+                totalItems: populatedCart.totalItems,
+                subtotal: populatedCart.totalAmount,
+                fullTotal: `₦${populatedCart.totalAmount?.toLocaleString() || '0'}`,
+                requiresPrescription: populatedCart.items.some(item => item.drug.prescriptionRequired)
+            },
+            timestamps: {
+                createdAt: populatedCart.createdAt,
+                updatedAt: populatedCart.updatedAt
+            }
+        };
+
+        return successResponse(res, response, 'Item removed from cart successfully');
     } catch (err) {
+        console.error('Error removing from cart:', err);
         return errorResponse(res, 'Failed to remove item from cart: ' + err.message);
     }
 };
@@ -303,8 +327,30 @@ exports.clearCart = async (req, res) => {
         cart.items = [];
         await cart.save();
 
-        return successResponse(res, cart, 'Cart cleared successfully');
+        const response = {
+            cartId: cart._id,
+            user: {
+                userId: req.user._id,
+                fullName: `${req.user.firstName} ${req.user.lastName}`,
+                email: req.user.email,
+                phone: req.user.phone
+            },
+            items: [],
+            summary: {
+                totalItems: 0,
+                subtotal: 0,
+                fullTotal: "₦0",
+                requiresPrescription: false
+            },
+            timestamps: {
+                createdAt: cart.createdAt,
+                updatedAt: cart.updatedAt
+            }
+        };
+
+        return successResponse(res, response, 'Cart cleared successfully');
     } catch (err) {
+        console.error('Error clearing cart:', err);
         return errorResponse(res, 'Failed to clear cart: ' + err.message);
     }
 };

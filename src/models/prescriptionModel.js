@@ -4,36 +4,18 @@ const prescriptionSchema = new mongoose.Schema({
   user: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: [true, 'A prescription must belong to a user']
-  },
-  doctorName: {
-    type: String,
-    required: [true, 'Please provide the doctor\'s name'],
-    trim: true
-  },
-  doctorLicense: {
-    type: String,
-    trim: true
-  },
-  hospital: {
-    type: String,
-    trim: true
-  },
-  diagnosis: {
-    type: String,
-    trim: true
-  },
-  prescriptionDate: {
-    type: Date,
-    required: [true, 'Please provide the prescription date']
-  },
-  expiryDate: {
-    type: Date,
-    required: [true, 'Please provide the prescription expiry date']
+    required: [true, 'User is required']
   },
   images: [{
-    url: String,
-    publicId: String
+    url: {
+      type: String,
+      required: [true, 'Image URL is required']
+    },
+    caption: String,
+    uploadedAt: {
+      type: Date,
+      default: Date.now
+    }
   }],
   status: {
     type: String,
@@ -46,46 +28,32 @@ const prescriptionSchema = new mongoose.Schema({
   },
   reviewedAt: Date,
   rejectionReason: String,
-  drugs: [{
-    drug: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Drug'
-    },
-    dosage: String,
-    frequency: String,
-    duration: String,
-    notes: String
-  }],
-  isActive: {
-    type: Boolean,
-    default: true
+  notes: String,
+  expiresAt: {
+    type: Date,
+    default: () => new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
   }
 }, {
-  timestamps: true,
-  toJSON: { virtuals: true },
-  toObject: { virtuals: true }
+  timestamps: true
 });
 
 // Indexes
-prescriptionSchema.index({ user: 1 });
-prescriptionSchema.index({ status: 1 });
-prescriptionSchema.index({ expiryDate: 1 });
-
-// Query middleware
-prescriptionSchema.pre(/^find/, function(next) {
-  this.populate({
-    path: 'user',
-    select: 'firstName lastName email phone'
-  }).populate({
-    path: 'drugs.drug',
-    select: 'name genericName dosageForm strength'
-  });
-  next();
-});
+prescriptionSchema.index({ user: 1, status: 1 });
+prescriptionSchema.index({ status: 1, createdAt: 1 });
+prescriptionSchema.index({ expiresAt: 1 });
 
 // Virtuals
 prescriptionSchema.virtual('isExpired').get(function() {
-  return this.expiryDate < Date.now();
+  return this.expiresAt < new Date();
 });
+
+prescriptionSchema.virtual('statusFormatted').get(function() {
+  return this.status.charAt(0).toUpperCase() + this.status.slice(1);
+});
+
+// Methods
+prescriptionSchema.methods.canBeUsedForOrder = function() {
+  return this.status === 'approved' && !this.isExpired;
+};
 
 module.exports = mongoose.model('Prescription', prescriptionSchema);

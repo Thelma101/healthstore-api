@@ -104,7 +104,7 @@ exports.getDrug = async (req, res) => {
 
 exports.createDrug = async (req, res) => {
   try {
-    const { images, ...drugData } = req.body;
+    const { images, prescriptionRequired, ...drugData } = req.body;
 
     const existingDrug = await Drug.findOne({ name: drugData.name });
     if (existingDrug) {
@@ -120,6 +120,7 @@ exports.createDrug = async (req, res) => {
 
     const newDrug = await Drug.create({
       ...drugData,
+       prescriptionRequired: prescriptionRequired || false,
       images: processedImages
     });
 
@@ -145,7 +146,7 @@ exports.createDrug = async (req, res) => {
       return badRequestResponse(res, err.message);
     }
 
-    return errorResponse(res, 'Failed to create drug: ' + err.message);
+    return errorResponse(res, 'Failed to create drug: ' + err.message + err.stack);
   }
 };
 
