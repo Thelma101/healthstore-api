@@ -13,7 +13,6 @@ const {
 
 
 
-// Upload prescription with Cloudinary
 exports.uploadPrescription = async (req, res) => {
   try {
     const files = req.files;
@@ -51,24 +50,23 @@ exports.uploadPrescription = async (req, res) => {
 
   } catch (err) {
     console.error('Error uploading prescription:', err);
-    
+
     // Clean up any uploaded files on error
     if (req.files) {
       for (const file of req.files) {
         await deleteImageFromCloudinary(file.path);
       }
     }
-    
+
     errorResponse(res, 'Failed to upload prescription: ' + err.message);
   }
 };
 
-// Get user's prescriptions
 exports.getUserPrescriptions = async (req, res) => {
   try {
     const { status } = req.query;
     const filter = { user: req.user._id };
-    
+
     if (status) {
       filter.status = status;
     }
@@ -106,7 +104,7 @@ exports.getUserPrescriptions = async (req, res) => {
   }
 };
 
-// Get prescription by ID
+
 exports.getPrescription = async (req, res) => {
   try {
     const { prescriptionId } = req.params;
@@ -170,11 +168,11 @@ exports.getAllPrescriptions = async (req, res) => {
 
     const { page = 1, limit = 10, status, userId } = req.query;
     const filter = {};
-    
+
     if (status) {
       filter.status = status;
     }
-    
+
     if (userId) {
       filter.user = userId;
     }
@@ -187,13 +185,13 @@ exports.getAllPrescriptions = async (req, res) => {
       .skip((page - 1) * limit);
 
     const total = await Prescription.countDocuments(filter);
-
     const response = prescriptions.map(prescription => ({
       prescriptionId: prescription._id,
       user: {
         userId: prescription.user._id,
         fullName: `${prescription.user.firstName} ${prescription.user.lastName}`,
-        email: prescription.user.email
+        email: prescription.user.email,
+        phone: prescription.user.phone
       },
       status: {
         current: prescription.status,
@@ -208,6 +206,8 @@ exports.getAllPrescriptions = async (req, res) => {
     }));
 
     successResponse(res, {
+      total
+    }, 'Prescriptions retrieved successfully', {
       prescriptions: response,
       pagination: {
         currentPage: parseInt(page),
@@ -216,7 +216,7 @@ exports.getAllPrescriptions = async (req, res) => {
         hasNext: page < Math.ceil(total / limit),
         hasPrev: page > 1
       }
-    }, 'Prescriptions retrieved successfully');
+    });
 
   } catch (err) {
     console.error('Error fetching all prescriptions:', err);
@@ -253,11 +253,11 @@ exports.updatePrescriptionStatus = async (req, res) => {
     prescription.status = status;
     prescription.reviewedBy = req.user._id;
     prescription.reviewedAt = new Date();
-    
+
     if (rejectionReason) {
       prescription.rejectionReason = rejectionReason;
     }
-    
+
     if (notes) {
       prescription.notes = notes;
     }
