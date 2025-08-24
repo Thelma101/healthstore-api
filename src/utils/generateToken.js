@@ -1,4 +1,3 @@
-// utils/tokenUtils.js
 const jwt = require('jsonwebtoken');
 
 const generateToken = (payload) => {

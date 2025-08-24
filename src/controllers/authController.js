@@ -1,7 +1,7 @@
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const User = require('../models/userModel');
-const { sendVerificationEmail, sendPasswordResetEmail } = require('../utils/emailSender');
+const { sendVerificationEmail, sendPasswordResetEmail } = require('../utils/emailService');
 const {
   successResponse,
   createdResponse,

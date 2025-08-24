@@ -7,7 +7,7 @@ const {
   notFoundResponse,
   errorResponse
 } = require('../utils/apiResponse');
-
+const { sendOrderConfirmationEmail, sendOrderStatusUpdateEmail } = require('../utils/emailService');
 
 exports.placeOrder = async (req, res) => {
   try {
@@ -126,6 +126,19 @@ exports.placeOrder = async (req, res) => {
     };
 
     successResponse(res, response, 'Order placed successfully');
+
+    await sendOrderConfirmationEmail(
+      req.user.email,
+      req.user.firstName,
+      {
+        orderNumber: order.orderNumber,
+        totalAmount: order.totalAmount,
+        items: order.items,
+        shippingAddress: order.shippingAddress,
+        status: order.status,
+        createdAt: order.createdAt
+      }
+    );
 
   } catch (err) {
     console.error('Error placing order:', err);
@@ -380,6 +393,18 @@ exports.updateOrderStatus = async (req, res) => {
     };
 
     successResponse(res, response, 'Order status updated successfully');
+
+    await sendOrderStatusUpdateEmail(
+      order.user.email,
+      order.user.firstName,
+      {
+        orderNumber: order.orderNumber,
+        totalAmount: order.totalAmount,
+        items: order.items
+      },
+      { formatted: oldStatus }, // Previous status
+      { formatted: order.statusFormatted, current: order.status } // New status
+    ); `ƒ`
 
   } catch (err) {
     console.error('Error updating order status:', err);
