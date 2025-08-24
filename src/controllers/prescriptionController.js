@@ -11,8 +11,6 @@ const {
   errorResponse
 } = require('../utils/apiResponse');
 
-
-
 exports.uploadPrescription = async (req, res) => {
   try {
     const files = req.files;
@@ -22,7 +20,6 @@ exports.uploadPrescription = async (req, res) => {
       return badRequestResponse(res, 'No prescription images uploaded');
     }
 
-    // Process uploaded files for Cloudinary
     const prescriptionImages = files.map((file, index) => ({
       url: file.path,
       caption: `Prescription image ${index + 1}`,
@@ -51,7 +48,6 @@ exports.uploadPrescription = async (req, res) => {
   } catch (err) {
     console.error('Error uploading prescription:', err);
 
-    // Clean up any uploaded files on error
     if (req.files) {
       for (const file of req.files) {
         await deleteImageFromCloudinary(file.path);
@@ -105,7 +101,7 @@ exports.getUserPrescriptions = async (req, res) => {
 };
 
 
-exports.getPrescription = async (req, res) => {
+exports.getPrescriptionById = async (req, res) => {
   try {
     const { prescriptionId } = req.params;
 
@@ -178,13 +174,20 @@ exports.getAllPrescriptions = async (req, res) => {
     }
 
     const prescriptions = await Prescription.find(filter)
-      .populate('user', 'firstName lastName email')
+      .populate('user', 'firstName lastName email phone')
       .populate('reviewedBy', 'firstName lastName')
       .sort({ createdAt: -1 })
       .limit(limit * 1)
       .skip((page - 1) * limit);
 
     const total = await Prescription.countDocuments(filter);
+    
+    const totalPrescriptions = await Prescription.countDocuments();
+    const totalImages = await Prescription.aggregate([
+      { $unwind: "$images" },
+      { $count: "totalImages" }
+    ]);
+
     const response = prescriptions.map(prescription => ({
       prescriptionId: prescription._id,
       user: {
@@ -197,8 +200,19 @@ exports.getAllPrescriptions = async (req, res) => {
         current: prescription.status,
         formatted: prescription.statusFormatted
       },
+      images: prescription.images.map(image => ({
+        imageId: image._id,
+        url: image.url,
+        caption: image.caption,
+        uploadedAt: image.uploadedAt
+      })),
       imagesCount: prescription.images.length,
-      reviewedBy: prescription.reviewedBy ? `${prescription.reviewedBy.firstName} ${prescription.reviewedBy.lastName}` : null,
+      rejectionReason: prescription.rejectionReason,
+      notes: prescription.notes,
+      reviewedBy: prescription.reviewedBy ? {
+        adminId: prescription.reviewedBy._id,
+        name: `${prescription.reviewedBy.firstName} ${prescription.reviewedBy.lastName}`
+      } : null,
       reviewedAt: prescription.reviewedAt,
       expiresAt: prescription.expiresAt,
       isExpired: prescription.isExpired,
@@ -206,8 +220,12 @@ exports.getAllPrescriptions = async (req, res) => {
     }));
 
     successResponse(res, {
-      total
-    }, 'Prescriptions retrieved successfully', {
+      summary: {
+        totalPrescriptions: totalPrescriptions,
+        totalImages: totalImages[0]?.totalImages || 0,
+        prescriptionsInResponse: prescriptions.length,
+        imagesInResponse: response.reduce((sum, pres) => sum + pres.imagesCount, 0)
+      },
       prescriptions: response,
       pagination: {
         currentPage: parseInt(page),
@@ -216,7 +234,7 @@ exports.getAllPrescriptions = async (req, res) => {
         hasNext: page < Math.ceil(total / limit),
         hasPrev: page > 1
       }
-    });
+    }, 'Prescriptions retrieved successfully');
 
   } catch (err) {
     console.error('Error fetching all prescriptions:', err);
@@ -239,7 +257,7 @@ exports.updatePrescriptionStatus = async (req, res) => {
     }
 
     const prescription = await Prescription.findById(prescriptionId)
-      .populate('user', 'firstName lastName email');
+      .populate('user', 'firstName lastName email phone');
 
     if (!prescription) {
       return notFoundResponse(res, 'Prescription not found');
@@ -337,7 +355,7 @@ exports.deletePrescriptionImage = async (req, res) => {
     prescription.images.pull(imageId);
     await prescription.save();
 
-    return successResponse(res, prescription, 'Prescription image deleted successfully');
+    return successResponse(res, 'Prescription image deleted successfully');
 
   } catch (err) {
     return errorResponse(res, 'Failed to delete prescription image: ' + err.message);

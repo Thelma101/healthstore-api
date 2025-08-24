@@ -44,6 +44,7 @@ const extractPublicId = (url) => {
 
 module.exports = {
   cloudinary,
+  storage,
   deleteImageFromCloudinary,
   extractPublicId
 };

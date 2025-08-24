@@ -13,7 +13,7 @@ router.use(authMiddleware.protect);
 router.post('/upload', upload.array('images', 5), prescriptionController.uploadPrescription);
 router.get('/my-prescriptions', prescriptionController.getUserPrescriptions);
 router.get('/check-valid', prescriptionController.checkValidPrescription);
-router.get('/:prescriptionId', prescriptionController.getPrescription);
+router.get('/:prescriptionId', prescriptionController.getPrescriptionById);
 router.delete('/:prescriptionId/images/:imageId', prescriptionController.deletePrescriptionImage);
 
 // Admin only routes
