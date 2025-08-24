@@ -136,6 +136,7 @@ exports.placeOrder = async (req, res) => {
         items: order.items,
         shippingAddress: order.shippingAddress,
         status: order.status,
+        formatted: order.statusFormatted,
         createdAt: order.createdAt
       }
     );
