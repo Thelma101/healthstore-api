@@ -127,19 +127,41 @@ exports.placeOrder = async (req, res) => {
 
     successResponse(res, response, 'Order placed successfully');
 
-    await sendOrderConfirmationEmail(
-      req.user.email,
-      req.user.firstName,
-      {
-        orderNumber: order.orderNumber,
-        totalAmount: order.totalAmount,
-        items: order.items,
-        shippingAddress: order.shippingAddress,
-        status: order.status,
-        formatted: order.statusFormatted,
-        createdAt: order.createdAt
-      }
-    );
+
+
+await sendOrderConfirmationEmail(
+  req.user.email,
+  req.user.firstName,
+  {
+    orderNumber: order.orderNumber,
+    totalAmount: order.totalAmount,
+    items: order.items.map(item => ({
+      name: item.name,
+      quantity: item.quantity,
+      price: item.price
+    })),
+    shippingAddress: order.shippingAddress,
+    status: {
+      current: order.status,
+      formatted: order.statusFormatted || 'Pending'
+    },
+    createdAt: order.createdAt
+  }
+);
+
+    // await sendOrderConfirmationEmail(
+    //   req.user.email,
+    //   req.user.firstName,
+    //   {
+    //     orderNumber: order.orderNumber,
+    //     totalAmount: order.totalAmount,
+    //     items: order.items,
+    //     shippingAddress: order.shippingAddress,
+    //     status: order.status,
+    //     formatted: order.statusFormatted,
+    //     createdAt: order.createdAt
+    //   }
+    // );
 
   } catch (err) {
     console.error('Error placing order:', err);
