@@ -22,14 +22,12 @@ exports.signup = async (req, res) => {
     console.log('Request Body:', req.body);
     console.log('Headers:', req.headers);
 
-    // 1) Validate password confirmation
     if (password !== passwordConfirm) {
       return validationErrorResponse(res, [
         { field: 'passwordConfirm', message: 'Passwords do not match' }
       ]);
     }
 
-    // 2) Check for existing user
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return conflictResponse(res, 'Email already registered', [
@@ -37,7 +35,6 @@ exports.signup = async (req, res) => {
       ]);
     }
 
-    // 3) Create and save user
     const newUser = await User.create({
       firstName,
       lastName,
@@ -47,7 +44,6 @@ exports.signup = async (req, res) => {
       address: typeof address === 'string' ? { street: address } : address
     });
 
-    // 4) Generate and save verification token
     const verificationToken = newUser.createEmailVerificationToken();
     await newUser.save({ validateBeforeSave: false });
 
@@ -60,10 +56,8 @@ exports.signup = async (req, res) => {
     console.log('Sending verification email to:', newUser.email);
     await sendVerificationEmail(newUser.email, newUser.firstName, verificationToken);
 
-    // 5) Generate JWT token for login
     const jwtToken = generateToken({ id: newUser._id });
 
-    // 6) Format response
     const userData = {
       user: {
         id: newUser._id,
@@ -86,7 +80,6 @@ exports.signup = async (req, res) => {
     return createdResponse(res, userData, 'Registration successful! Check your email to verify your account.');
 
   } catch (err) {
-    // Handle validation errors
     if (err.name === 'ValidationError') {
       const errors = Object.values(err.errors).map(e => ({
         field: e.path,
@@ -94,8 +87,6 @@ exports.signup = async (req, res) => {
       }));
       return validationErrorResponse(res, errors);
     }
-
-    // Handle duplicate email error
     if (err.code === 11000) {
       return conflictResponse(res, 'Email already registered', [
         { field: 'email', message: 'Email already registered' }
@@ -112,7 +103,6 @@ exports.login = async (req, res) => {
 
     const { email, password } = req.body;
 
-    // 1) Validate input
     if (!email || !password) {
       console.log('Validation failed - missing email or password');
       return res.status(400).json({
@@ -125,7 +115,6 @@ exports.login = async (req, res) => {
       });
     }
 
-    // 2) Check if user exists
     const user = await User.findOne({ email }).select('+password');
     if (!user) {
       console.log('User not found for email:', email);
@@ -139,7 +128,6 @@ exports.login = async (req, res) => {
       });
     }
 
-    // 3) Verify password
     const isPasswordValid = await user.verifyPassword(password);
     if (!isPasswordValid) {
       console.log('Invalid password for user:', user.email);
@@ -153,7 +141,6 @@ exports.login = async (req, res) => {
       });
     }
 
-    // 4) Check if email is verified
     if (!user.isEmailVerified) {
       console.log('Email not verified for user:', user.email);
       return res.status(403).json({
@@ -166,18 +153,15 @@ exports.login = async (req, res) => {
       });
     }
 
-    // 5) Generate token
     const token = generateToken({
       id: user._id,
       email: user.email,
       role: user.role
     });
 
-    // 6) Update last login
     user.lastLogin = Date.now();
     await user.save({ validateBeforeSave: false });
 
-    // 7) Format response
     console.log('Successful login for user:', user.email);
     return res.status(200).json({
       success: true,
@@ -236,7 +220,6 @@ exports.forgotPassword = async (req, res) => {
       ]);
     }
 
-    // 2) Find user (security: don't reveal if user doesn't exist)
     const user = await User.findOne({ email });
 
     if (user) {
@@ -256,7 +239,7 @@ exports.forgotPassword = async (req, res) => {
       );
     }
 
-    return successResponse(res, null, "If email exists, reset link sent");
+    return successResponse(res, null, "If email exists, reset link has been sent");
   } catch (err) {
     console.error('Forgot password error:', err);
     return errorResponse(res, "Password reset request failed");
@@ -267,8 +250,7 @@ exports.forgotPassword = async (req, res) => {
 exports.resetPassword = async (req, res) => {
   try {
     const { token } = req.params;
-    
-    // Debug logs
+
     console.log('Reset Password Request:', {
       method: req.method,
       params: req.params,
@@ -276,7 +258,6 @@ exports.resetPassword = async (req, res) => {
       headers: req.headers
     });
 
-    // 1. Verify the token first (like email verification)
     const hashedToken = crypto
       .createHash('sha256')
       .update(token)
@@ -333,16 +314,13 @@ exports.updatePassword = async (req, res) => {
 
     const user = await User.findById(req.user.id).select('+password');
 
-    // 1) Verify current password
     if (!(await user.verifyPassword(currentPassword))) {
       return unauthorizedResponse(res, "Current password is incorrect");
     }
 
-    // 2) Update password
     user.password = newPassword;
     await user.save();
 
-    // 3) Return new token
     const authToken = generateToken({
       id: user._id,
       email: user.email,

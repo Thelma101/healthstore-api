@@ -12,7 +12,7 @@ const seedAdmins = async () => {
       socketTimeoutMS: 30000
     });
     
-    console.log('✅ DB connected successfully');
+    console.log('DB connected successfully');
 
     // Admin accounts data
     const accounts = [
@@ -27,7 +27,7 @@ const seedAdmins = async () => {
         isEmailVerified: true
       },
       {
-        firstName: 'System',
+        firstName: 'Pharmacist',
         lastName: 'Admin',
         email: 'admin@ths.com',
                 phone: '07025345678',
@@ -38,12 +38,10 @@ const seedAdmins = async () => {
       }
     ];
 
-    // Clear existing test accounts
     await User.deleteMany({ 
       email: { $in: accounts.map(a => a.email) } 
     });
 
-    // Create accounts
     const created = await User.insertMany(accounts);
 
     console.log('\n🔥 Admin accounts created:');

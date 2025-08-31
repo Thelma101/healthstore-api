@@ -263,7 +263,6 @@ exports.updatePrescriptionStatus = async (req, res) => {
       return notFoundResponse(res, 'Prescription not found');
     }
 
-    // If rejecting, require a reason
     if (status === 'rejected' && !rejectionReason) {
       return badRequestResponse(res, 'Rejection reason is required when rejecting a prescription');
     }
@@ -334,7 +333,6 @@ exports.checkValidPrescription = async (req, res) => {
   }
 };
 
-// Delete prescription image
 exports.deletePrescriptionImage = async (req, res) => {
   try {
     const { prescriptionId, imageId } = req.params;

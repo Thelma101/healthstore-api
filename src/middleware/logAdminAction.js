@@ -15,7 +15,7 @@ const logAdminAction = (action, entity) => {
       next();
     } catch (err) {
       console.error('Audit log failed:', err);
-      next(); // Don't block the request if logging fails
+      next();
     }
   };
 };

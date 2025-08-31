@@ -1,6 +1,5 @@
 const Joi = require('joi');
 
-// Register validation schema
 const registerSchema = Joi.object({
   firstName: Joi.string().min(2).max(30).required().messages({
     'string.empty': 'First name is required',
@@ -20,7 +19,6 @@ const registerSchema = Joi.object({
   }),
 });
 
-// Login validation schema
 const loginSchema = Joi.object({
   email: Joi.string().email().required().messages({
     'string.email': 'Email must be valid',
@@ -32,7 +30,6 @@ const loginSchema = Joi.object({
   }),
 });
 
-// Middleware to validate register input
 const validateRegister = (req, res, next) => {
   const { error } = registerSchema.validate(req.body, { abortEarly: false });
   if (error) {
@@ -44,7 +41,6 @@ const validateRegister = (req, res, next) => {
   next();
 };
 
-// Middleware to validate login input
 const validateLogin = (req, res, next) => {
   const { error } = loginSchema.validate(req.body, { abortEarly: false });
   if (error) {

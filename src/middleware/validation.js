@@ -1,6 +1,5 @@
 const { body, param, query, validationResult } = require('express-validator');
 
-// Handle validation errors
 const handleValidationErrors = (req, res, next) => {
   const errors = validationResult(req);
   
@@ -21,7 +20,6 @@ const handleValidationErrors = (req, res, next) => {
   next();
 };
 
-// User validation rules
 const validateUserRegistration = [
   body('firstName')
     .trim()

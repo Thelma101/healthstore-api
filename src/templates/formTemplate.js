@@ -1,4 +1,3 @@
-// src/templates/formTemplates.js
 const resetPasswordFormTemplate = (token) => `
 <!DOCTYPE html>
 <html lang="en">

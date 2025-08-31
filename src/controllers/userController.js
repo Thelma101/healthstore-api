@@ -36,7 +36,6 @@ exports.updateUser = async (req, res) => {
     const { id } = req.params;
     const updates = req.body;
 
-    // Prevent role escalation from non-superadmins
     if (updates.role && req.admin.role !== 'superadmin') {
       return res.status(403).json({
         success: false,

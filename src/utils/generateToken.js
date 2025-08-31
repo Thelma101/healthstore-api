@@ -13,7 +13,7 @@ const setTokenCookie = (res, token) => {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'strict',
-    maxAge: parseInt(process.env.JWT_COOKIE_EXPIRE) || 30 * 24 * 60 * 60 * 1000 // 30 days
+    maxAge: parseInt(process.env.JWT_COOKIE_EXPIRE) || 30 * 24 * 60 * 60 * 1000
   });
 };
 

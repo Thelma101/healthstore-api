@@ -12,8 +12,6 @@ const { sendOrderConfirmationEmail, sendOrderStatusUpdateEmail } = require('../u
 exports.placeOrder = async (req, res) => {
   try {
     const { shippingAddress, paymentMethod, notes } = req.body;
-
-    // Get user's cart with populated items
     const cart = await Cart.findOne({ user: req.user._id })
       .populate('items.drug', 'name price prescriptionRequired quantity');
 
@@ -21,7 +19,6 @@ exports.placeOrder = async (req, res) => {
       return badRequestResponse(res, 'Cart is empty');
     }
 
-    // Check stock availability 
     const orderItems = [];
     let totalAmount = 0;
 
@@ -81,7 +78,6 @@ exports.placeOrder = async (req, res) => {
     await order.populate('user', 'firstName lastName email phone');
     await order.populate('items.drug', 'name images');
 
-    // Clear cart after successful order
     cart.items = [];
     await cart.save();
 
@@ -382,7 +378,6 @@ exports.updateOrderStatus = async (req, res) => {
           );
         }
 
-        // Deduct from stock
         item.drug.quantity -= item.quantity;
         await item.drug.save();
       }
@@ -425,8 +420,8 @@ exports.updateOrderStatus = async (req, res) => {
         totalAmount: order.totalAmount,
         items: order.items
       },
-      { formatted: oldStatus }, // Previous status
-      { formatted: order.statusFormatted, current: order.status } // New status
+      { formatted: oldStatus }, 
+      { formatted: order.statusFormatted, current: order.status }
     ); `ƒ`
 
   } catch (err) {

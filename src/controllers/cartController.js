@@ -57,8 +57,8 @@ exports.getCart = async (req, res) => {
             })),
             summary: {
                 totalItems: cart.totalItems,
-                subtotal: cart.totalAmount, // ✅ FIX: Use totalAmount, not subtotal
-                fullTotal: `₦${cart.totalAmount?.toLocaleString() || '0'}`, // ✅ FIX: Use totalAmount
+                subtotal: cart.totalAmount,
+                fullTotal: `₦${cart.totalAmount?.toLocaleString() || '0'}`,
                 requiresPrescription: cart.items.some(item => item.drug.prescriptionRequired)
             },
             timestamps: {
@@ -152,8 +152,8 @@ exports.addToCart = async (req, res) => {
             })),
             summary: {
                 totalItems: populatedCart.totalItems,
-                subtotal: populatedCart.totalAmount, // ✅ FIX: Use totalAmount
-                fullTotal: `₦${populatedCart.totalAmount?.toLocaleString() || '0'}`, // ✅ FIX: Use totalAmount
+                subtotal: populatedCart.totalAmount,
+                fullTotal: `₦${populatedCart.totalAmount?.toLocaleString() || '0'}`, 
                 requiresPrescription: populatedCart.items.some(item => item.drug.prescriptionRequired)
             },
             timestamps: {

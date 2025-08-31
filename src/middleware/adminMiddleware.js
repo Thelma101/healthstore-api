@@ -2,10 +2,8 @@ const User = require('../models/userModel');
 
 const adminMiddleware = async (req, res, next) => {
   try {
-    // 1. Get user from request (assuming you attach user during auth)
     const user = req.user;
     
-    // 2. Verify admin role
     if (!user || user.role !== 'admin') {
       return res.status(403).json({
         success: false,
@@ -13,7 +11,6 @@ const adminMiddleware = async (req, res, next) => {
       });
     }
 
-    // 3. Additional admin verification if needed
     const adminUser = await User.findById(user.id).select('+role +isActive');
     if (!adminUser || !adminUser.isActive) {
       return res.status(403).json({
@@ -22,7 +19,6 @@ const adminMiddleware = async (req, res, next) => {
       });
     }
 
-    // 4. Attach full admin user object if needed
     req.admin = adminUser;
     next();
   } catch (err) {

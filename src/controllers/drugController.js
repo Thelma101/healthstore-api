@@ -14,18 +14,15 @@ const {
 
 
 const apiFeatures = async (req, query) => {
-  // 1) Filtering
   const queryObj = { ...req.query };
   const excludedFields = ['page', 'sort', 'limit', 'fields'];
   excludedFields.forEach(el => delete queryObj[el]);
 
-  // Advanced filtering
   let queryStr = JSON.stringify(queryObj);
   queryStr = queryStr.replace(/\b(gte|gt|lte|lt)\b/g, match => `$${match}`);
 
   query = query.find(JSON.parse(queryStr));
 
-  // 2) Sorting
   if (req.query.sort) {
     const sortBy = req.query.sort.split(',').join(' ');
     query = query.sort(sortBy);
@@ -33,7 +30,6 @@ const apiFeatures = async (req, query) => {
     query = query.sort('-createdAt');
   }
 
-  // 3) Field limiting
   if (req.query.fields) {
     const fields = req.query.fields.split(',').join(' ');
     query = query.select(fields);
@@ -41,7 +37,6 @@ const apiFeatures = async (req, query) => {
     query = query.select('-__v');
   }
 
-  // 4) Pagination
   const page = req.query.page * 1 || 1;
   const limit = req.query.limit * 1 || 100;
   const skip = (page - 1) * limit;
@@ -285,7 +280,6 @@ exports.uploadDrugImagesDirect = async (req, res) => {
 
     const drug = await Drug.findById(id);
     if (!drug) {
-      // Clean up uploaded files if drug doesn't exist
       for (const file of files) {
         await deleteImageFromCloudinary(file.path);
       }
@@ -313,7 +307,6 @@ exports.uploadDrugImagesDirect = async (req, res) => {
     return successResponse(res, drug, 'Images uploaded successfully');
 
   } catch (err) {
-    // Clean up any uploaded files on error
     if (req.files) {
       for (const file of req.files) {
         await deleteImageFromCloudinary(file.path);

@@ -14,11 +14,6 @@ router.get('/:id', drugController.getDrug);
 // router.post('/:id/images', drugController.uploadDrugImages);
 // Protected routes (require authentication)
 router.use(authMiddleware.protect);
-// Add this new route
-// router.get('/subcategory/:subcategory', drugController.getDrugsBySubcategory);
-
-// Restricted to admins
-// router.use(authController.restrictTo('admin', 'superadmin'));
 
 router.post('/', 
   authMiddleware.protect, 
@@ -43,11 +38,10 @@ router.get('/inventory/expired', drugController.checkExpiredDrugs);
 // Cloudinary direct upload routes
 router.post('/:id/images/upload',
   authMiddleware.restrictTo('admin', 'pharmacist'),
-  upload.array('images', 5), // Max 5 images
+  upload.array('images', 5),
   drugController.uploadDrugImagesDirect
 );
 
-// Keep the existing URL-based image upload for flexibility
 router.post('/:id/images',
   authMiddleware.restrictTo('admin', 'pharmacist'),
   drugController.uploadDrugImages
