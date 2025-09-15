@@ -430,7 +430,6 @@ exports.updateOrderStatus = async (req, res) => {
   }
 };
 
-
 exports.cancelOrder = async (req, res) => {
   try {
     const { orderId } = req.params;
