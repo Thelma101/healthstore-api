@@ -347,7 +347,7 @@ exports.getAllOrders = async (req, res) => {
   }
 };
 
-// Admin: Update order status
+// Admin: Update
 exports.updateOrderStatus = async (req, res) => {
   try {
     if (req.user.role !== 'admin') {
