@@ -112,8 +112,6 @@ The Tee's Health Store Team
   }
 };
 
-
-
 const sendPasswordResetEmail = async (email, firstName, token) => {
   const resetUrl = `${process.env.CLIENT_URL}/reset-password/${token}`;
 // const resetUrl = `${process.env.CLIENT_URL}/reset-password?token=${token}`;
