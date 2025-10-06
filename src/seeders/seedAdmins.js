@@ -1,7 +1,7 @@
 // src/seeders/seedAdmins.js
 require('dotenv').config({ path: '../.env' }); // Points to .env in project root
 const mongoose = require('mongoose');
-const User = require('../models/userModel'); // Path from seeders to models
+const User = require('../models/userModel'); 
 const bcrypt = require('bcryptjs');
 
 const seedAdmins = async () => {
