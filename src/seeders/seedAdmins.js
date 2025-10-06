@@ -6,7 +6,7 @@ const bcrypt = require('bcryptjs');
 
 const seedAdmins = async () => {
   try {
-    // Connect with modern options
+
     await mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/healthstore',  {
       serverSelectionTimeoutMS: 5000,
       socketTimeoutMS: 30000
