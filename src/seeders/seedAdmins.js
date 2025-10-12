@@ -1,4 +1,4 @@
-// src/seeders/seedAdmins.js
+// src/seeders/seedAdmins
 require('dotenv').config({ path: '../.env' }); 
 const mongoose = require('mongoose');
 const User = require('../models/userModel'); 
