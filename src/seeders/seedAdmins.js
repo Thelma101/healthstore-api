@@ -11,7 +11,7 @@ const seedAdmins = async () => {
     });    
     console.log('DB connected successfully');
 
-    // Admin Mock 
+    // Admin Mock Data
     const accounts = [
       {
         firstName: 'Super',
