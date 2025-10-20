@@ -190,7 +190,7 @@ const resetPasswordTemplate = `
                     const result = await response.json();
                     
                     if (response.ok) {
-                        successContainer.textContent = 'Password reset successfully! Redirecting to login...';
+                        successContainer.textContent = 'Password has been reset successfully! Redirecting to login...';
                         setTimeout(() => {
                             window.location.href = '/login';
                         }, 2000);
