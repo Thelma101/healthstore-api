@@ -21,7 +21,7 @@ const resetPasswordFormTemplate = (token) => `
     </div>
 
     <script>
-        // Your existing JavaScript
+
     </script>
 </body>
 </html>
