@@ -20,9 +20,7 @@ const resetPasswordFormTemplate = (token) => `
         </form>
     </div>
 
-    <script>
 
-    </script>
 </body>
 </html>
 `;
