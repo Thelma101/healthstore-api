@@ -19,8 +19,6 @@ const { generateToken, setTokenCookie } = require('../utils/generateToken');
 exports.signup = async (req, res) => {
   try {
     const { firstName, lastName, email, password, passwordConfirm, phone, address } = req.body;
-    console.log('Request Body:', req.body);
-    console.log('Headers:', req.headers);
 
     if (password !== passwordConfirm) {
       return validationErrorResponse(res, [
@@ -47,13 +45,6 @@ exports.signup = async (req, res) => {
     const verificationToken = newUser.createEmailVerificationToken();
     await newUser.save({ validateBeforeSave: false });
 
-    console.log('=== REGISTRATION DEBUG ===');
-    console.log('Plain verification token:', verificationToken);
-    console.log('Hashed token in DB:', newUser.emailVerificationToken);
-    console.log('Token expires at:', newUser.emailVerificationExpire);
-    console.log('Current time:', new Date());
-
-    console.log('Sending verification email to:', newUser.email);
     await sendVerificationEmail(newUser.email, newUser.firstName, verificationToken);
 
     const jwtToken = generateToken({ id: newUser._id });
@@ -72,8 +63,7 @@ exports.signup = async (req, res) => {
       },
       auth: {
         token: jwtToken,
-        expiresIn: process.env.JWT_EXPIRES_IN,
-        verificationToken: verificationToken
+        expiresIn: process.env.JWT_EXPIRE || '1d'
       }
     }
 
@@ -179,11 +169,7 @@ exports.login = async (req, res) => {
     });
 
   } catch (err) {
-    console.error('Login error:', {
-      message: err.message,
-      stack: err.stack,
-      body: req.body
-    });
+    console.error('Login error:', err.message);
 
     return res.status(500).json({
       success: false,
@@ -198,9 +184,8 @@ exports.login = async (req, res) => {
 
 exports.logout = (req, res) => {
   try {
-    res.clearCookie('jwt', 'loggedout', {
+    res.clearCookie('jwt', {
       httpOnly: true,
-      expires: new Date(Date.now() + 10 * 1000),
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
     });
@@ -226,12 +211,6 @@ exports.forgotPassword = async (req, res) => {
       const resetToken = user.createPasswordResetToken();
       await user.save({ validateBeforeSave: false });
 
-      console.log('Password Reset Token:', {
-        plainToken: resetToken,
-        hashedToken: user.resetPasswordToken,
-        expiresAt: new Date(user.resetPasswordExpire)
-      });
-
       await sendPasswordResetEmail(
         user.email,
         user.firstName || 'User',
@@ -251,13 +230,6 @@ exports.resetPassword = async (req, res) => {
   try {
     const { token } = req.params;
 
-    console.log('Reset Password Request:', {
-      method: req.method,
-      params: req.params,
-      body: req.body,
-      headers: req.headers
-    });
-
     const hashedToken = crypto
       .createHash('sha256')
       .update(token)
@@ -272,13 +244,6 @@ exports.resetPassword = async (req, res) => {
       return badRequestResponse(res, "Invalid or expired token");
     }
 
-
-    if (req.method === 'GET') {
-    return successResponse(res, { 
-      email: user.email,
-      isValid: true 
-    }, "Password updated successfully. ");
-    }
 
     const { password } = req.body;
     if (!password) {

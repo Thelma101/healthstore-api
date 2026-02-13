@@ -1,5 +1,6 @@
 const Order = require('../models/orderModel');
 const Cart = require('../models/cartModel');
+const Prescription = require('../models/prescriptionModel');
 const {
   successResponse,
   noContentResponse,
@@ -40,6 +41,19 @@ exports.placeOrder = async (req, res) => {
       totalAmount += item.price * item.quantity;
     }
 
+    const orderData = {
+      user: req.user._id,
+      items: orderItems,
+      totalAmount,
+      shippingAddress: shippingAddress || req.user.address,
+      contactInfo: {
+        phone: req.user.phone,
+        email: req.user.email
+      },
+      paymentMethod: paymentMethod || 'card',
+      notes
+    };
+
     // Check if order requires prescription
     const requiresPrescription = cart.items.some(item => item.drug.prescriptionRequired);
 
@@ -56,23 +70,8 @@ exports.placeOrder = async (req, res) => {
         );
       }
 
-      // Attach the valid prescription to the order
       orderData.prescription = validPrescription._id;
     }
-
-    const orderData = {
-      user: req.user._id,
-      items: orderItems,
-      totalAmount,
-      shippingAddress: shippingAddress || req.user.address,
-      contactInfo: {
-        phone: req.user.phone,
-        email: req.user.email
-      },
-      paymentMethod: paymentMethod || 'card',
-      notes,
-      prescription: req.user.prescription
-    };
 
     const order = await Order.create(orderData);
     await order.populate('user', 'firstName lastName email phone');
@@ -123,41 +122,29 @@ exports.placeOrder = async (req, res) => {
 
     successResponse(res, response, 'Order placed successfully');
 
-
-
-await sendOrderConfirmationEmail(
-  req.user.email,
-  req.user.firstName,
-  {
-    orderNumber: order.orderNumber,
-    totalAmount: order.totalAmount,
-    items: order.items.map(item => ({
-      name: item.name,
-      quantity: item.quantity,
-      price: item.price
-    })),
-    shippingAddress: order.shippingAddress,
-    status: {
-      current: order.status,
-      formatted: order.statusFormatted || 'Pending'
-    },
-    createdAt: order.createdAt
-  }
-);
-
-    // await sendOrderConfirmationEmail(
-    //   req.user.email,
-    //   req.user.firstName,
-    //   {
-    //     orderNumber: order.orderNumber,
-    //     totalAmount: order.totalAmount,
-    //     items: order.items,
-    //     shippingAddress: order.shippingAddress,
-    //     status: order.status,
-    //     formatted: order.statusFormatted,
-    //     createdAt: order.createdAt
-    //   }
-    // );
+    try {
+      await sendOrderConfirmationEmail(
+        req.user.email,
+        req.user.firstName,
+        {
+          orderNumber: order.orderNumber,
+          totalAmount: order.totalAmount,
+          items: order.items.map(item => ({
+            name: item.name,
+            quantity: item.quantity,
+            price: item.price
+          })),
+          shippingAddress: order.shippingAddress,
+          status: {
+            current: order.status,
+            formatted: order.statusFormatted || 'Pending'
+          },
+          createdAt: order.createdAt
+        }
+      );
+    } catch (emailErr) {
+      console.error('Failed to send order confirmation email:', emailErr.message);
+    }
 
   } catch (err) {
     console.error('Error placing order:', err);
@@ -391,6 +378,7 @@ exports.updateOrderStatus = async (req, res) => {
       }
     }
 
+    const oldStatus = order.status;
     order.status = status;
     if (notes) {
       order.notes = notes;
@@ -405,24 +393,28 @@ exports.updateOrderStatus = async (req, res) => {
         current: order.status,
         formatted: order.statusFormatted
       },
-      previousStatus: order.status,
+      previousStatus: oldStatus,
       notes: order.notes,
       updatedAt: order.updatedAt
     };
 
     successResponse(res, response, 'Order status updated successfully');
 
-    await sendOrderStatusUpdateEmail(
-      order.user.email,
-      order.user.firstName,
-      {
-        orderNumber: order.orderNumber,
-        totalAmount: order.totalAmount,
-        items: order.items
-      },
-      { formatted: oldStatus }, 
-      { formatted: order.statusFormatted, current: order.status }
-    ); `ƒ`
+    try {
+      await sendOrderStatusUpdateEmail(
+        order.user.email,
+        order.user.firstName,
+        {
+          orderNumber: order.orderNumber,
+          totalAmount: order.totalAmount,
+          items: order.items
+        },
+        { formatted: oldStatus },
+        { formatted: order.statusFormatted, current: order.status }
+      );
+    } catch (emailErr) {
+      console.error('Failed to send status update email:', emailErr.message);
+    }
 
   } catch (err) {
     console.error('Error updating order status:', err);

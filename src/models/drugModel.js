@@ -194,10 +194,10 @@ const drugSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Dosage is required']
   },
-  // prescriptionRequired: {
-  //   type: Boolean,
-  //   default: true
-  // },
+  prescriptionRequired: {
+    type: Boolean,
+    default: false
+  },
   hasUploadedPrescription: {
     type: Boolean,
     default: false
@@ -245,21 +245,6 @@ drugSchema.pre('findOneAndUpdate', function (next) {
 drugSchema.index({ price: 1, ratingsAverage: -1 });
 drugSchema.index({ slug: 1 });
 drugSchema.index({ name: 'text', genericName: 'text', description: 'text' });
-
-// Document middleware
-drugSchema.pre('save', function (next) {
-  this.slug = slugify(this.name, { lower: true });
-  next();
-});
-
-// Query middleware
-drugSchema.pre(/^find/, function (next) {
-  this.populate({
-    path: 'category',
-    select: 'name description'
-  });
-  next();
-});
 
 // Virtual populate
 drugSchema.virtual('reviews', {

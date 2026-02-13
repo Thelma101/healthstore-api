@@ -90,35 +90,6 @@ const userSchema = new mongoose.Schema({
 });
 
 
-userSchema.methods.createEmailVerificationToken = function () {
-    const verificationToken = crypto.randomBytes(32).toString('hex');
-
-    this.emailVerificationToken = crypto
-        .createHash('sha256')
-        .update(verificationToken)
-        .digest('hex');
-
-    this.emailVerificationExpire = Date.now() + 24 * 60 * 60 * 10000;
-
-    return verificationToken;
-};
-
-
-// userSchema.methods.generateAuthToken = function() {
-//   const token = jwt.sign(
-//     { id: this._id, email: this.email, role: this.role },
-//     process.env.JWT_SECRET,
-//     { expiresIn: process.env.JWT_EXPIRES_IN || '1d' }
-//   );
-//   return token;
-// };
-
-
-// Also add the verifyPassword method if not already present
-userSchema.methods.verifyPassword = async function (candidatePassword) {
-    return await bcrypt.compare(candidatePassword, this.password);
-};
-
 userSchema.pre('save', async function (next) {
     if (!this.isModified('password')) return next();
 
@@ -155,7 +126,7 @@ userSchema.methods = {
             .update(resetToken)
             .digest('hex');
 
-        this.resetPasswordExpire = Date.now() + 10 * 60 * 172800000;
+        this.resetPasswordExpire = Date.now() + 10 * 60 * 1000;
         return resetToken;
     },
 
@@ -167,7 +138,7 @@ userSchema.methods = {
             .update(verificationToken)
             .digest('hex');
 
-        this.emailVerificationExpire = Date.now() + 24 * 60 * 60 * 172800000;
+        this.emailVerificationExpire = Date.now() + 24 * 60 * 60 * 1000;
 
         return verificationToken;
     }

@@ -23,13 +23,12 @@ const errorResponse = (res, message = 'Internal Server Error', statusCode = 500,
     success: false,
     message,
     errors,
-    stack: errors.stack,
     timestamp: new Date().toISOString()
   });
 };
 
 const badRequestResponse = (res, message = 'Bad Request', errors = []) => {
-  return errorResponse(res, message, 400, errors + errors.stack);
+  return errorResponse(res, message, 400, errors);
 };
 
 const unauthorizedResponse = (res, message = 'Unauthorized') => {

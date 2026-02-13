@@ -16,20 +16,19 @@ router.get('/:id', drugController.getDrug);
 router.use(authMiddleware.protect);
 
 router.post('/', 
-  authMiddleware.protect, 
   authMiddleware.restrictTo('admin', 'pharmacist'),
   drugController.createDrug
 );
 
 router.patch('/:id', 
-  authMiddleware.protect,
   authMiddleware.restrictTo('admin', 'pharmacist'),
   drugController.updateDrug
 );
 
-router.post('/', drugController.createDrug);
-router.patch('/:id', drugController.updateDrug);
-router.delete('/:id', drugController.deleteDrug);
+router.delete('/:id',
+  authMiddleware.restrictTo('admin', 'pharmacist'),
+  drugController.deleteDrug
+);
 
 // Inventory management routes
 router.get('/inventory/low-stock', drugController.checkLowStock);

@@ -9,11 +9,6 @@ const {
 exports.verifyEmail = async (req, res) => {
   try {
     const tokenFromUrl = req.params.token;
-    
-    console.log('Verification attempt:', {
-      token: tokenFromUrl,
-      time: new Date()
-    });
 
     const hashedToken = crypto
       .createHash('sha256')
@@ -24,12 +19,6 @@ exports.verifyEmail = async (req, res) => {
       emailVerificationToken: hashedToken,
       emailVerificationExpire: { $gt: Date.now() }
     }).select('+emailVerificationToken +emailVerificationExpire');
-
-    console.log('User verification status:', {
-      userExists: !!user,
-      storedToken: user?.emailVerificationToken,
-      expiresAt: user?.emailVerificationExpire
-    });
 
     if (!user) {
       return badRequestResponse(res, "Invalid or expired verification token");

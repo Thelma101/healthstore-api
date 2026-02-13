@@ -48,13 +48,6 @@ categorySchema.pre('save', function (next) {
 categorySchema.index({ slug: 1 });
 categorySchema.index({ name: 'text', description: 'text' });
 
-// Document middleware
-categorySchema.pre('save', function (next) {
-  this.slug = slugify(this.name, { lower: true });
-  next();
-});
-
-
 categorySchema.virtual('drugCount', {
   ref: 'Drug',
   foreignField: 'category',

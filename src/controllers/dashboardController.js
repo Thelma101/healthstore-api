@@ -48,7 +48,7 @@ exports.getDashboardStats = async (req, res) => {
           { $group: { _id: null, total: { $sum: '$totalAmount' } } }
         ]),
         Drug.countDocuments(),
-        Drug.countDocuments({ quantity: { $lt: 10 }, quantity: { $gt: 0 } }),
+        Drug.countDocuments({ quantity: { $lt: 10, $gt: 0 } }),
         Drug.countDocuments({ quantity: 0 }),
         Drug.countDocuments({ prescriptionRequired: true }),
         Drug.countDocuments({ prescriptionRequired: false })

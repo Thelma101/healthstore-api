@@ -5,7 +5,7 @@ const helmet = require('helmet');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const routes = require('./src/routes/mainRoute');
-const { errorHandler } = require('./src//middleware/errorMiddleware');
+const { errorHandler, notFound } = require('./src/middleware/errorMiddleware');
 
 const app = express();
 
@@ -35,8 +35,16 @@ app.use(generalLimiter);
 app.use(express.json({ limit: '30kb' }));
 app.use(express.urlencoded({ extended: true }));
 
+// Health check
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
 // Routes
 app.use('/api/v1/', routes);
+
+// 404 handler
+app.use(notFound);
 
 // Error handling
 app.use(errorHandler);

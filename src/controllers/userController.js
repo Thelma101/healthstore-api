@@ -2,7 +2,8 @@ const User = require('../models/userModel');
 const {
   successResponse,
   notFoundResponse,
-  validationErrorResponse
+  validationErrorResponse,
+  errorResponse
 } = require('../utils/apiResponse');
 
 exports.getAllUsers = async (req, res) => {

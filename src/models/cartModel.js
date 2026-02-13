@@ -51,9 +51,6 @@ const cartSchema = new mongoose.Schema({
   toObject: { virtuals: true }
 });
 
-// Indexes
-cartSchema.index({ user: 1 });
-
 // Virtuals
 cartSchema.virtual('userDisplayName').get(function() {
   if (this.user && this.user.firstName && this.user.lastName) {
@@ -78,10 +75,6 @@ cartSchema.virtual('total').get(function() {
 
 cartSchema.virtual('FullTotal').get(function() {
   return this.subtotal ? `₦${this.subtotal.toLocaleString()}` : '₦0';
-});
-
-cartSchema.virtual('totalItems').get(function() {
-  return this.items.reduce((sum, item) => sum + item.quantity, 0);
 });
 
 cartSchema.virtual('totalAmount').get(function() {  

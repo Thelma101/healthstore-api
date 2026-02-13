@@ -1,5 +1,5 @@
 const Drug = require('../models/drugModel');
-const { cloudinary } = require('../config/cloudinary');
+const { cloudinary, deleteImageFromCloudinary } = require('../config/cloudinary');
 const {
   successResponse,
   createdResponse,
